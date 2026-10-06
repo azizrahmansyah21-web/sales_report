@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const nextConfig = {
+  experimental: {
+    serverActions: {
+      allowedOrigins: ["*.trycloudflare.com"],
+    },
+  },
+  // Izinkan tunnel di development
+  allowedDevOrigins: ["*.trycloudflare.com"],
 };
+
 
 export default nextConfig;
