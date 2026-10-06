@@ -1,0 +1,57 @@
+// Prisma Schema for Sistem Pelaporan Prospek Sales
+// Sesuai BRD & Pedoman AGENTS.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SALES
+}
+
+enum ProspectStatus {
+  NEW
+  FOLLOW_UP
+  DEAL
+  LOST
+}
+
+model User {
+  id        String     @id @default(uuid())
+  name      String
+  username  String?    @unique
+  email     String?    @unique
+  password  String
+  role      Role       @default(SALES)
+  prospects Prospect[]
+
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Prospect {
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerName  String         @map("customer_name")
+  customerPhone String         @map("customer_phone")
+  unitName      String         @map("unit_name")
+  status        ProspectStatus @default(NEW)
+  notes         String?        @db.Text
+
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  @@index([customerPhone])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("prospects")
+}
