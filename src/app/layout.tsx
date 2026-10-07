@@ -14,15 +14,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Agung Toyota UjungBatu — Sistem Pelaporan Prospek & Deteksi Duplikasi",
+  title: "Agung Toyota UjungBatu — Sistem Laporan SPK H-1",
   description:
-    "Sistem Pelaporan Prospek Sales & Deteksi Duplikasi Real-Time PT Agung Automall Cabang UjungBatu (Cabang Resmi 247)",
-  applicationName: "Agung Toyota Sales Report",
-  authors: [{ name: "PT Agung Automall UjungBatu" }],
+    "Sistem Laporan Rencana SPK H-1 & Realisasi Closing Sales PT Agung Automall Cabang UjungBatu (Cabang Resmi 247)",
+  applicationName: "Agung Toyota SPK H-1",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Toyota ATUB",
+    title: "SPK H-1 ATUB",
   },
 };
 

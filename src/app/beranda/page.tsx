@@ -1,79 +1,110 @@
-"use client";
-
 import React from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import MobilePwaLayout from "@/components/templates/MobilePwaLayout";
 import MetricCard from "@/components/molecules/MetricCard";
-import ProspectCardMobile from "@/components/organisms/ProspectCardMobile";
-import { MOCK_MOBILE_PROSPECTS } from "@/lib/mockData";
+import PlanSpkCardMobile from "@/components/organisms/PlanSpkCardMobile";
 import {
   UserPlus,
   ArrowRight,
-  Sparkles,
   Calendar,
-  CheckCircle,
-  TrendingUp,
-  Tag,
+  Sparkles,
+  Inbox,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 
-export default function BerandaPage() {
+export default async function BerandaPage() {
+  const session = await auth();
+
+  if (!session?.user) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id;
+  const salesName = session.user.name || "Sales Advisor";
+  const salesTitle = session.user.title || "Sales Advisor Lapangan";
+  const salesUsername = session.user.username ? `@${session.user.username}` : "";
+
+  // Fetch actual operational plan SPKs and KPI stats for this authenticated sales
+  const [recentPlans, totalCount, pendingCount, berhasilCount] = await Promise.all([
+    prisma.planSPK.findMany({
+      where: { salesId: userId },
+      orderBy: { planDate: "desc" },
+      take: 6,
+    }),
+    prisma.planSPK.count({ where: { salesId: userId } }),
+    prisma.planSPK.count({ where: { salesId: userId, spkStatus: "PENDING" } }),
+    prisma.planSPK.count({ where: { salesId: userId, spkStatus: "BERHASIL" } }),
+  ]);
+
+  const todayFormatted = new Date().toLocaleDateString("id-ID", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
-    <MobilePwaLayout salesName="Bagus Triyanto" isOnline={true}>
+    <MobilePwaLayout salesName={salesName} isOnline={true}>
       <div className="space-y-5">
-        {/* Sales Greeting & Shift Status Card */}
+        {/* Sales Greeting & Operational Status Card */}
         <div className="rounded-2xl bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 text-white p-5 shadow-md relative overflow-hidden">
           <div className="relative z-10 space-y-3">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/15 text-blue-100 backdrop-blur-xs border border-white/20">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Shift Lapangan Aktif • Ring 1
+                <span>Monitoring H-1 Aktif</span>
               </span>
 
               <div className="flex items-center gap-1 text-[11px] text-blue-200">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>24 Okt 2024</span>
+                <span>{todayFormatted}</span>
               </div>
             </div>
 
             <div>
-              <p className="text-xs text-blue-200 font-medium">Selamat Pagi,</p>
+              <p className="text-xs text-blue-200 font-medium">Selamat Datang,</p>
               <h2 className="text-xl font-black tracking-tight text-white">
-                Bagus Triyanto
+                {salesName}
               </h2>
               <p className="text-xs text-blue-200/90 font-mono mt-0.5">
-                NPK-ATUB-202108 • Senior Sales Advisor
+                {salesUsername ? `${salesUsername} • ` : ""}{salesTitle}
               </p>
             </div>
           </div>
 
-          {/* Background Decorative Rings */}
+          {/* Decorative visual accents */}
           <div className="absolute -bottom-8 -right-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
           <div className="absolute top-0 right-10 w-24 h-24 rounded-full bg-blue-500/20 blur-xl pointer-events-none" />
         </div>
 
-        {/* 3 KPI Summary Cards */}
+        {/* Real-time KPI Summary Cards */}
         <div className="grid grid-cols-3 gap-2.5">
           <MetricCard
-            title="Hari Ini"
-            value="4"
-            trend={{ value: "+2", isPositive: true }}
+            title="Menunggu"
+            value={pendingCount}
+            subtitle="Menunggu Hari H"
+            icon={<Clock className="w-3.5 h-3.5 text-amber-600" />}
             className="p-3!"
           />
           <MetricCard
-            title="Target Bln"
-            value="28"
-            progress={{ current: 28, target: 35, percentage: 80 }}
+            title="SPK Berhasil"
+            value={berhasilCount}
+            subtitle="Closing Valid"
+            icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
             className="p-3!"
           />
           <MetricCard
-            title="Deal SPK"
-            value="6"
-            subtitle="Unit Valid"
+            title="Total Plan"
+            value={totalCount}
+            subtitle="Diajukan"
             className="p-3!"
           />
         </div>
 
-        {/* Primary CTA: Input Prospek Baru */}
+        {/* Primary CTA Button: Input Plan SPK Baru */}
         <div>
           <Link
             href="/input"
@@ -86,10 +117,10 @@ export default function BerandaPage() {
                 </div>
                 <div>
                   <h3 className="font-extrabold text-base leading-tight">
-                    + Input Prospek Baru
+                    + Buat Rencana SPK Besok
                   </h3>
                   <p className="text-[11px] text-blue-100 mt-0.5">
-                    Notifikasi seketika ke WhatsApp Group Sales
+                    Input rencana penutupan SPK H-1 untuk approval SPV
                   </p>
                 </div>
               </div>
@@ -98,50 +129,52 @@ export default function BerandaPage() {
           </Link>
         </div>
 
-        {/* Recent Prospects Feed */}
+        {/* Recent Plan SPK List */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
-              <span>Prospek Terkini (Hari Ini)</span>
+              <span>Rencana SPK Terbaru</span>
               <span className="w-2 h-2 rounded-full bg-blue-600" />
             </h3>
 
-            <Link
-              href="/riwayat"
-              className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
-            >
-              Lihat Semua ({MOCK_MOBILE_PROSPECTS.length}) &rarr;
-            </Link>
+            {totalCount > 0 && (
+              <Link
+                href="/riwayat"
+                className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+              >
+                Lihat Semua ({totalCount}) &rarr;
+              </Link>
+            )}
           </div>
 
-          <div className="space-y-3">
-            {MOCK_MOBILE_PROSPECTS.map((item) => (
-              <ProspectCardMobile key={item.id} prospect={item} />
-            ))}
-          </div>
-        </div>
-
-        {/* Promotional Flash Banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-red-600 to-rose-700 text-white p-4 shadow-sm border border-red-500 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-bold tracking-wider uppercase">
-              <Tag className="w-3 h-3" />
-              Promo Flash Q4
-            </span>
-            <span className="text-[10px] text-red-100 font-medium">
-              S.d 31 Des 2024
-            </span>
-          </div>
-
-          <div>
-            <h4 className="font-extrabold text-sm leading-tight">
-              Program DP Rendah Hilux & Calya
-            </h4>
-            <p className="text-xs text-red-100 mt-0.5 leading-snug">
-              Paket khusus perkebunan sawit Rokan Hulu. Bunga 0% tenor 1 tahun
-              via Toyota Astra Finance (TAF).
-            </p>
-          </div>
+          {recentPlans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center bg-white space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                <Inbox className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-slate-800">
+                  Belum ada rencana SPK
+                </p>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                  Mulai catat rencana penutupan SPK besok sekarang untuk dipantau oleh SPV.
+                </p>
+              </div>
+              <Link
+                href="/input"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Buat Rencana Pertama</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {recentPlans.map((plan) => (
+                <PlanSpkCardMobile key={plan.id} plan={plan} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </MobilePwaLayout>

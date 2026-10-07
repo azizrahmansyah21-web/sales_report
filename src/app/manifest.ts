@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Agung Toyota UjungBatu - Sales Report",
-    short_name: "Toyota ATUB",
+    name: "Agung Toyota UjungBatu - Laporan SPK H-1",
+    short_name: "SPK H-1 ATUB",
     description:
-      "Sistem Pelaporan Prospek Sales & Deteksi Duplikasi Real-Time Agung Toyota Cabang UjungBatu",
+      "Sistem Laporan Rencana SPK H-1 & Realisasi Closing Sales Agung Toyota Cabang UjungBatu",
     start_url: "/beranda",
     display: "standalone",
     background_color: "#f8fafc",

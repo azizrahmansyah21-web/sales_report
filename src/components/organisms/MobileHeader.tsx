@@ -2,6 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import Badge from "@/components/atoms/Badge";
 import Avatar from "@/components/atoms/Avatar";
@@ -18,6 +19,17 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   isOnline = true,
   unreadCount = 1,
 }) => {
+  const pathname = usePathname();
+
+  const pageTitle =
+    pathname.startsWith("/input")
+      ? "Input SPK"
+      : pathname.startsWith("/riwayat")
+      ? "Riwayat SPK"
+      : pathname.startsWith("/profil")
+      ? "Profil Sales"
+      : "Beranda";
+
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs">
       {/* Brand & Page Info */}
@@ -25,7 +37,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         <ToyotaLogo size="sm" />
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 leading-none">
-            <span className="font-black text-sm text-slate-900">Beranda</span>
+            <span className="font-black text-sm text-slate-900">{pageTitle}</span>
             <Badge variant={isOnline ? "ONLINE" : "OFFLINE"} size="sm" showDot>
               {isOnline ? "ONLINE" : "OFFLINE"}
             </Badge>

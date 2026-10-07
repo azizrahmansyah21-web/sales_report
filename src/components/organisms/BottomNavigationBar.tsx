@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import BottomNavItem from "@/components/molecules/BottomNavItem";
-import { Home, UserPlus, History, User } from "lucide-react";
+import { Home, PlusCircle, History, User } from "lucide-react";
 
 export const BottomNavigationBar: React.FC = () => {
   const pathname = usePathname();
@@ -17,7 +17,7 @@ export const BottomNavigationBar: React.FC = () => {
     {
       href: "/input",
       label: "Input",
-      icon: <UserPlus className="w-5 h-5" />,
+      icon: <PlusCircle className="w-5 h-5" />,
     },
     {
       href: "/riwayat",
