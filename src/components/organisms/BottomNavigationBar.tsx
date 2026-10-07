@@ -33,7 +33,7 @@ export const BottomNavigationBar: React.FC = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg"
+      className="fixed md:absolute bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg"
       aria-label="Navigasi Bawah Sales"
     >
       <div className="max-w-md mx-auto flex items-center justify-around px-2 py-1">

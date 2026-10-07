@@ -1,6 +1,18 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Calendar, Car, AlertTriangle, Clock, CheckCircle2, XCircle, FileText } from "lucide-react";
+import {
+  Calendar,
+  Car,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  ChevronDown,
+  Info,
+} from "lucide-react";
 import type { PlanSPK } from "@prisma/client";
 
 export interface PlanSpkCardMobileProps {
@@ -8,27 +20,47 @@ export interface PlanSpkCardMobileProps {
 }
 
 export const PlanSpkCardMobile: React.FC<PlanSpkCardMobileProps> = ({ plan }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const isPending = plan.spkStatus === "PENDING";
   const isSuccess = plan.spkStatus === "BERHASIL";
   const isFailed = plan.spkStatus === "BELUM_BERHASIL";
 
-  // Format plan date for display
-  const formattedDate = new Date(plan.planDate).toLocaleDateString("id-ID", {
-    weekday: "short",
+  const formattedPlanDate = new Date(plan.planDate).toLocaleDateString("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const formattedCreatedAt = new Date(plan.createdAt).toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 
   return (
     <div
+      onClick={() => setIsExpanded((prev) => !prev)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setIsExpanded((prev) => !prev);
+        }
+      }}
       className={cn(
-        "rounded-2xl border p-4 transition-all duration-200 shadow-xs relative flex flex-col gap-2.5",
+        "rounded-2xl border p-4 transition-all duration-200 shadow-xs relative flex flex-col gap-2.5 cursor-pointer select-none text-left",
         plan.isRepeatFailed
-          ? "bg-amber-50/70 border-amber-300 ring-1 ring-amber-300/40"
+          ? "bg-amber-50/70 border-amber-300 ring-1 ring-amber-300/40 hover:bg-amber-50"
           : isSuccess
-          ? "bg-emerald-50/40 border-emerald-200"
-          : "bg-white border-slate-200/90 hover:border-slate-300"
+          ? "bg-emerald-50/40 border-emerald-200 hover:bg-emerald-50/60"
+          : isFailed
+          ? "bg-rose-50/30 border-rose-200 hover:bg-rose-50/50"
+          : "bg-white border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/50"
       )}
     >
       {/* Header: Customer Name and Status Badge */}
@@ -66,11 +98,11 @@ export const PlanSpkCardMobile: React.FC<PlanSpkCardMobileProps> = ({ plan }) =>
         )}
       </div>
 
-      {/* Target Plan Date & Badges */}
+      {/* Target Plan Date & Flags */}
       <div className="flex items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100">
         <div className="flex items-center gap-1 text-[11px] text-slate-600 font-medium">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <span>Target: {formattedDate}</span>
+          <span>Target: {formattedPlanDate}</span>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -85,6 +117,12 @@ export const PlanSpkCardMobile: React.FC<PlanSpkCardMobileProps> = ({ plan }) =>
               Duplikat
             </span>
           )}
+          <ChevronDown
+            className={cn(
+              "w-3.5 h-3.5 text-slate-400 transition-transform duration-200",
+              isExpanded && "rotate-180 text-slate-600"
+            )}
+          />
         </div>
       </div>
 
@@ -99,6 +137,32 @@ export const PlanSpkCardMobile: React.FC<PlanSpkCardMobileProps> = ({ plan }) =>
             <p className="text-[11px] text-slate-700 leading-relaxed font-normal">
               {plan.keterangan}
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Expandable Audit Details */}
+      {isExpanded && (
+        <div className="pt-2 border-t border-slate-200/60 mt-0.5 text-[11px] space-y-1.5 text-slate-600 bg-slate-50/80 -mx-4 -mb-4 p-3.5 rounded-b-2xl animate-in fade-in duration-150">
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Waktu Input Rencana:</span>
+            <span className="font-medium text-slate-700">{formattedCreatedAt} WIB</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-slate-400">Jadwal Realisasi:</span>
+            <span className="font-semibold text-slate-800">
+              {isPending
+                ? "Menunggu penentuan hasil di Hari H"
+                : isSuccess
+                ? "Closing terverifikasi SPV"
+                : "Belum tercapai closing"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 pt-1 text-[10px] text-slate-400">
+            <Info className="w-3 h-3 text-blue-500 shrink-0" />
+            <span>Rekap harian otomatis dikirim pukul 08:00 WIB</span>
           </div>
         </div>
       )}
