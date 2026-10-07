@@ -1,5 +1,5 @@
-// Prisma Schema for Sistem Pelaporan Prospek Sales
-// Sesuai BRD & Pedoman AGENTS.md
+// Prisma Schema — Laporan SPK H-1
+// Agung Toyota UjungBatu
 
 generator client {
   provider = "prisma-client-js"
@@ -10,48 +10,64 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── ENUMS ────────────────────────────────────────────────────────────────
+
 enum Role {
-  ADMIN
-  SALES
+  ADMIN  // Kelola sistem & isi keterangan
+  SPV    // Supervisor — approve/reject SPK
+  SALES  // Input plan SPK H-1
 }
 
-enum ProspectStatus {
-  NEW
-  FOLLOW_UP
-  DEAL
-  LOST
+enum SpkStatus {
+  PENDING         // Rencana / Menunggu Hari H
+  BERHASIL        // SPK Berhasil (Closing)
+  BELUM_BERHASIL  // Belum Berhasil SPK
 }
+
+// ─── MODELS ───────────────────────────────────────────────────────────────
 
 model User {
-  id        String     @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
-  username  String?    @unique
-  email     String?    @unique
+  nip       String?   @unique
+  username  String?   @unique
+  email     String?   @unique
   password  String
-  role      Role       @default(SALES)
-  prospects Prospect[]
+  role      Role      @default(SALES)
+  title     String?
+  phone     String?
+  isActive  Boolean   @default(true) @map("is_active")
+  planSpks  PlanSPK[]
 
-  createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
-model Prospect {
-  id            String         @id @default(uuid())
-  userId        String         @map("user_id")
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customerName  String         @map("customer_name")
-  customerPhone String         @map("customer_phone")
-  unitName      String         @map("unit_name")
-  status        ProspectStatus @default(NEW)
-  notes         String?        @db.Text
+model PlanSPK {
+  id                String    @id @default(uuid())
+  salesId           String    @map("sales_id")
+  sales             User      @relation(fields: [salesId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  customerName      String    @map("customer_name")
+  unitName          String    @map("unit_name")
 
-  @@index([customerPhone])
-  @@index([userId])
-  @@index([createdAt])
-  @@map("prospects")
+  planDate          DateTime  @map("plan_date")
+
+  spkStatus         SpkStatus @default(PENDING) @map("spk_status")
+  keterangan        String?   @db.Text
+
+  isDuplicate       Boolean   @default(false) @map("is_duplicate")
+  isRepeatFailed    Boolean   @default(false) @map("is_repeat_failed")
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([salesId])
+  @@index([planDate])
+  @@index([customerName, salesId])
+  @@index([isDuplicate])
+  @@index([spkStatus])
+  @@map("plan_spk")
 }
