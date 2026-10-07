@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import {
@@ -152,13 +153,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
 
         {/* Quick Logout */}
-        <Link
-          href="/admin/login"
-          className="flex items-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium"
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium text-left"
         >
           <LogOut className="w-3.5 h-3.5" />
           <span>Keluar Portal Admin</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );
