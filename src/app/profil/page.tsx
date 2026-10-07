@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 import MobilePwaLayout from "@/components/templates/MobilePwaLayout";
 import Avatar from "@/components/atoms/Avatar";
 import Badge from "@/components/atoms/Badge";
@@ -21,6 +22,11 @@ import {
 } from "lucide-react";
 
 export default function ProfilPage() {
+  const { data: session } = useSession();
+  const salesName = session?.user?.name || "Bagus Triyanto";
+  const salesTitle = session?.user?.title || "Senior Sales Executive";
+  const salesNip = session?.user?.username ? `@${session.user.username}` : "NPK-ATUB-202108";
+
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState("Hari ini, 13:45 WIB");
 
@@ -91,20 +97,20 @@ export default function ProfilPage() {
   ];
 
   return (
-    <MobilePwaLayout salesName="Bagus Triyanto" isOnline={true}>
+    <MobilePwaLayout salesName={salesName} isOnline={true}>
       <div className="space-y-5">
         {/* Profile Header Card */}
         <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs text-center space-y-3 relative overflow-hidden">
           {/* Top Rank Ribbon */}
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-300 text-xs font-bold tracking-tight">
             <Award className="w-3.5 h-3.5 text-amber-600" />
-            <span>Top Sales Penetrasi Rokan Hulu • RANK #2</span>
+            <span>Sales Terverifikasi • Cabang UjungBatu</span>
           </div>
 
           {/* Avatar with Ring */}
           <div className="flex justify-center pt-1">
             <Avatar
-              name="Bagus Triyanto"
+              name={salesName}
               size="xl"
               isOnline={true}
               className="ring-4 ring-blue-50"
@@ -113,10 +119,10 @@ export default function ProfilPage() {
 
           <div>
             <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              Bagus Triyanto
+              {salesName}
             </h2>
             <p className="text-xs font-semibold text-slate-600 mt-0.5">
-              NPK-ATUB-202108 • Senior Sales Executive
+              {salesNip} • {salesTitle}
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
               PT Agung Automall — Cabang UjungBatu (247)
@@ -239,13 +245,14 @@ export default function ProfilPage() {
 
         {/* Logout Button */}
         <div className="pt-2">
-          <Link
-            href="/login"
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full h-12 rounded-2xl bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 border border-red-200 text-xs font-bold flex items-center justify-center gap-2 transition-colors select-none shadow-2xs"
           >
             <LogOut className="w-4 h-4 text-red-600" />
             <span>Keluar dari Akun Sales</span>
-          </Link>
+          </button>
         </div>
       </div>
     </MobilePwaLayout>
