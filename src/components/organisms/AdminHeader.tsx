@@ -40,14 +40,14 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </button>
         )}
 
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <ToyotaLogo size="sm" />
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
             <span className="text-slate-400">Portal Operasional</span>
             <span className="text-slate-300">&gt;</span>
             <span className="font-bold text-slate-800">Cabang UjungBatu</span>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Middle: Quick Search Input */}
@@ -65,11 +65,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
       {/* Right Controls: Period Filter, Bell, Admin Profile */}
       <div className="flex items-center gap-3 shrink-0">
         {/* Period Selector Pill */}
-        <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
+        {/* <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
           <span>Periode: <strong>Bulan Berjalan (Q2 2024)</strong></span>
           <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-        </div>
+        </div> */}
 
         {/* Notifications Bell */}
         <button

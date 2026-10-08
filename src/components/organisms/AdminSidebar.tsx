@@ -68,12 +68,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 Agung Toyota
               </span>
               <span className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">
-                SISTEM PROSPEK
+                Plan SPK H-1
               </span>
             </div>
           </Link>
 
-          <div className="mt-3.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+          {/* <div className="mt-3.5 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                 UJUNGBATU • ROKAN HULU
@@ -85,7 +85,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 </p>
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Navigation Links */}

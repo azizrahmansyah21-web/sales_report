@@ -249,11 +249,10 @@ export default function AdminTeamClient({
             <button
               type="button"
               onClick={() => setFilterTab("ALL")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterTab === "ALL"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${filterTab === "ALL"
                   ? "bg-slate-900 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                }`}
             >
               Semua ({totalSales})
             </button>
@@ -261,11 +260,10 @@ export default function AdminTeamClient({
             <button
               type="button"
               onClick={() => setFilterTab("TOP")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterTab === "TOP"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${filterTab === "TOP"
                   ? "bg-emerald-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                }`}
             >
               Top Performer ({members.filter((m) => m.stats.berhasil > 0).length})
             </button>
@@ -273,11 +271,10 @@ export default function AdminTeamClient({
             <button
               type="button"
               onClick={() => setFilterTab("ATTENTION")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterTab === "ATTENTION"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${filterTab === "ATTENTION"
                   ? "bg-amber-500 text-amber-950 shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                }`}
             >
               Perlu Perhatian (
               {
@@ -294,11 +291,10 @@ export default function AdminTeamClient({
             <button
               type="button"
               onClick={() => setFilterTab("PENDING")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                filterTab === "PENDING"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${filterTab === "PENDING"
                   ? "bg-blue-600 text-white shadow-2xs"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
+                }`}
             >
               Ada Pending ({members.filter((m) => m.stats.pending > 0).length})
             </button>
@@ -342,9 +338,8 @@ export default function AdminTeamClient({
                     return (
                       <tr
                         key={member.id}
-                        className={`transition-colors hover:bg-slate-50/80 ${
-                          isTop1 ? "bg-amber-50/20" : ""
-                        }`}
+                        className={`transition-colors hover:bg-slate-50/80 ${isTop1 ? "bg-amber-50/20" : ""
+                          }`}
                       >
                         {/* Rank Badge */}
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
@@ -457,13 +452,12 @@ export default function AdminTeamClient({
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all ${
-                                  parseFloat(member.stats.successRate) >= 50
+                                className={`h-full rounded-full transition-all ${parseFloat(member.stats.successRate) >= 50
                                     ? "bg-emerald-600"
                                     : parseFloat(member.stats.successRate) > 0
-                                    ? "bg-blue-600"
-                                    : "bg-slate-300"
-                                }`}
+                                      ? "bg-blue-600"
+                                      : "bg-slate-300"
+                                  }`}
                                 style={{
                                   width: `${Math.min(
                                     parseFloat(member.stats.successRate),
@@ -545,7 +539,7 @@ export default function AdminTeamClient({
         </div>
 
         {/* Operational SOP Policy Box for Branch 247 */}
-        <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-3 border border-slate-800 shadow-md">
+        {/* <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-3 border border-slate-800 shadow-md">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center gap-2 text-xs font-bold text-blue-400 uppercase tracking-wider">
               <ShieldCheck className="w-4 h-4" />
@@ -576,7 +570,7 @@ export default function AdminTeamClient({
               </p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Quick Inspection Modal for Sales Plans */}

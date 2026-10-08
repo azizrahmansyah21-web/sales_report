@@ -98,7 +98,7 @@ export default function InputPlanSpkPage() {
 
   return (
     <MobilePwaLayout salesName={salesName} isOnline={true}>
-      <div className="space-y-4">
+      <div className="max-w-2xl mx-auto space-y-4">
         {/* Success feedback state */}
         {submittedPlan && (
           <div className="space-y-3 animate-in fade-in duration-200">

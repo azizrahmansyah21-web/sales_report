@@ -37,8 +37,8 @@ yarn-error.log*
 *.md
 
 # package manifests (user custom ignore)
-package.json
-package-lock.json
+# package.json
+# package-lock.json
 
 # vercel
 .vercel

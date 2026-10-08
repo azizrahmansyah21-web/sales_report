@@ -81,7 +81,7 @@ export default async function BerandaPage() {
         </div>
 
         {/* Real-time KPI Summary Cards */}
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
           <MetricCard
             title="Menunggu"
             value={pendingCount}
@@ -169,7 +169,7 @@ export default async function BerandaPage() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {recentPlans.map((plan) => (
                 <PlanSpkCardMobile key={plan.id} plan={plan} />
               ))}

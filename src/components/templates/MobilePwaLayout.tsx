@@ -18,22 +18,19 @@ export const MobilePwaLayout: React.FC<MobilePwaLayoutProps> = ({
   showBottomNav = true,
 }) => {
   return (
-    <div className="min-h-screen bg-slate-200/60 flex justify-center py-0 md:py-6 antialiased">
-      {/* Mobile Device Frame */}
-      <main className="w-full max-w-md bg-[#f8fafc] min-h-screen md:min-h-[844px] md:max-h-[920px] md:rounded-3xl shadow-2xl relative flex flex-col overflow-hidden border border-slate-300/60">
-        {/* Sticky Mobile Header */}
-        {showHeader && (
-          <MobileHeader salesName={salesName} isOnline={isOnline} />
-        )}
+    <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
+      {/* Responsive Top Header */}
+      {showHeader && (
+        <MobileHeader salesName={salesName} isOnline={isOnline} />
+      )}
 
-        {/* Scrollable Page Body */}
-        <div className="flex-1 overflow-y-auto pb-24 px-4 py-4 scroll-smooth">
-          {children}
-        </div>
-
-        {/* Fixed Mobile Bottom Navigation */}
-        {showBottomNav && <BottomNavigationBar />}
+      {/* Main Responsive Body Container (Centers and breathes gracefully on desktop) */}
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
+        {children}
       </main>
+
+      {/* Mobile Bottom Navigation Bar (Hidden on desktop md:) */}
+      {showBottomNav && <BottomNavigationBar />}
     </div>
   );
 };

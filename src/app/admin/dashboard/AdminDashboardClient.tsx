@@ -195,10 +195,10 @@ export default function AdminDashboardClient({
                       Rasio Realisasi:{" "}
                       {currentSelectedWeek.prospects > 0
                         ? (
-                            (currentSelectedWeek.spk /
-                              currentSelectedWeek.prospects) *
-                            100
-                          ).toFixed(1)
+                          (currentSelectedWeek.spk /
+                            currentSelectedWeek.prospects) *
+                          100
+                        ).toFixed(1)
                         : "0.0"}
                       %
                     </span>
@@ -222,11 +222,10 @@ export default function AdminDashboardClient({
                       <div
                         key={d.week}
                         onClick={() => setActiveTooltipWeek(idx + 1)}
-                        className={`flex-1 flex flex-col items-center justify-end cursor-pointer group transition-all p-2 rounded-xl ${
-                          isSelected
-                            ? "bg-slate-50 ring-1 ring-blue-200"
-                            : "hover:bg-slate-50/50"
-                        }`}
+                        className={`flex-1 flex flex-col items-center justify-end cursor-pointer group transition-all p-2 rounded-xl ${isSelected
+                          ? "bg-slate-50 ring-1 ring-blue-200"
+                          : "hover:bg-slate-50/50"
+                          }`}
                       >
                         {/* Values label */}
                         <div className="flex items-center gap-1.5 mb-2 text-[11px] font-bold">
@@ -238,19 +237,17 @@ export default function AdminDashboardClient({
                         {/* Dual Bar Column */}
                         <div className="w-full flex items-end justify-center gap-1.5 h-28">
                           <div
-                            className={`w-6 rounded-t-lg transition-all ${
-                              isSelected
-                                ? "bg-blue-600"
-                                : "bg-blue-400/80 group-hover:bg-blue-500"
-                            }`}
+                            className={`w-6 rounded-t-lg transition-all ${isSelected
+                              ? "bg-blue-600"
+                              : "bg-blue-400/80 group-hover:bg-blue-500"
+                              }`}
                             style={{ height: `${plansHeight}%` }}
                           />
                           <div
-                            className={`w-6 rounded-t-lg transition-all ${
-                              isSelected
-                                ? "bg-emerald-600"
-                                : "bg-emerald-400/80 group-hover:bg-emerald-500"
-                            }`}
+                            className={`w-6 rounded-t-lg transition-all ${isSelected
+                              ? "bg-emerald-600"
+                              : "bg-emerald-400/80 group-hover:bg-emerald-500"
+                              }`}
                             style={{ height: `${spkHeight}%` }}
                           />
                         </div>
@@ -307,15 +304,14 @@ export default function AdminDashboardClient({
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${
-                            index === 0
-                              ? "bg-amber-100 text-amber-900 border border-amber-300"
-                              : index === 1
+                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${index === 0
+                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                            : index === 1
                               ? "bg-slate-200 text-slate-800"
                               : index === 2
-                              ? "bg-amber-700/20 text-amber-900"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
+                                ? "bg-amber-700/20 text-amber-900"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
                         >
                           {item.rank}
                         </span>
@@ -426,47 +422,6 @@ export default function AdminDashboardClient({
               </div>
             </div>
           </div>
-
-          {/* Branch Operational Insight Card */}
-          <div className="rounded-2xl bg-gradient-to-br from-blue-900 to-indigo-950 text-white p-5 sm:p-6 shadow-md flex flex-col justify-between">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-blue-300 uppercase tracking-wider">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <span>Insight Operasional Cabang</span>
-              </div>
-
-              <h4 className="font-extrabold text-base leading-snug text-white">
-                Fokus Unit: {primaryModel}
-              </h4>
-
-              <p className="text-xs text-blue-100/90 leading-relaxed">
-                Unit dengan rencana closing terbanyak adalah{" "}
-                <strong>{primaryModel}</strong> ({primaryModelCount} unit),
-                mendominasi permintaan armada dan niaga di wilayah UjungBatu dan Tandun.
-              </p>
-
-              {topModels.length > 1 && (
-                <div className="p-3 rounded-xl bg-white/10 border border-white/15 text-xs text-blue-100 space-y-1.5">
-                  <p className="font-semibold text-white">Distribusi Unit Teratas:</p>
-                  <ul className="text-[11px] text-blue-200 space-y-1">
-                    {topModels.slice(0, 3).map((m) => (
-                      <li key={m.name} className="flex justify-between items-center">
-                        <span className="truncate">{m.name}</span>
-                        <span className="font-bold text-white shrink-0 ml-2">
-                          {m.count} unit
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs text-blue-300">
-              <span>Sistem Pelaporan H-1 (08:00 WIB)</span>
-              <span className="font-bold text-white">Aktif</span>
-            </div>
-          </div>
         </div>
 
         {/* Live Feed: 5 Rencana Terbaru yang Diinput Sales */}
@@ -507,11 +462,10 @@ export default function AdminDashboardClient({
                   recentPlans.map((plan) => (
                     <tr
                       key={plan.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
-                        plan.isRepeatFailed || plan.isDuplicate
-                          ? "bg-amber-50/40"
-                          : ""
-                      }`}
+                      className={`hover:bg-slate-50/80 transition-colors ${plan.isRepeatFailed || plan.isDuplicate
+                        ? "bg-amber-50/40"
+                        : ""
+                        }`}
                     >
                       <td className="py-3 px-3 font-bold text-slate-900">
                         {plan.customerName}

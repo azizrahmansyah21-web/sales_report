@@ -108,7 +108,7 @@ export default function ProfilClient({
 
   return (
     <MobilePwaLayout salesName={salesName} isOnline={true}>
-      <div className="space-y-5">
+      <div className="max-w-2xl mx-auto space-y-5">
         {/* Profile Header Card */}
         <div className="rounded-3xl bg-white border border-slate-200/90 p-5 shadow-xs text-center space-y-3 relative overflow-hidden">
           {/* Top Rank Ribbon */}

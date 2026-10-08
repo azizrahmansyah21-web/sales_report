@@ -6,6 +6,14 @@ import { planSpkSchema, updateSpkStatusSchema, updateKeteranganSchema } from "@/
 import { SpkStatus } from "@prisma/client";
 import type { PlanSPK, User, Prisma } from "@prisma/client";
 
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Gracefully ignore outside Next.js request context (e.g. testing)
+  }
+}
+
 // ─── TYPE DEFINITIONS ──────────────────────────────────────────────────────
 
 export type PlanSpkWithUser = PlanSPK & {
@@ -47,10 +55,9 @@ export async function createPlanSpk(
     const { customerName, unitName, planDate } = parsed.data;
     const cleanCustomerName = customerName.trim();
 
-    // Deteksi duplikat: cari plan sebelumnya dengan nama customer yang sama dari sales yang sama
+    // Deteksi duplikat: cari plan sebelumnya dengan nama customer yang sama di cabang
     const previousPlans = await prisma.planSPK.findMany({
       where: {
-        salesId: userId,
         customerName: {
           equals: cleanCustomerName,
           mode: "insensitive",
@@ -75,8 +82,8 @@ export async function createPlanSpk(
       },
     });
 
-    revalidatePath("/beranda");
-    revalidatePath("/admin/dashboard");
+    safeRevalidatePath("/beranda");
+    safeRevalidatePath("/admin/dashboard");
     return { success: true, data: newPlan };
   } catch (error) {
     console.error("[createPlanSpk] Error:", error);
@@ -155,14 +162,21 @@ export async function getPlanSpks(params?: {
 
 import { auth } from "@/lib/auth";
 
+export interface ActionSessionUser {
+  id: string;
+  role: string;
+  name?: string | null;
+}
+
 // ─── UPDATE SPK STATUS (Oleh Admin & SPV) ──────────────────────────────────
 
 export async function updateSpkStatus(
   planId: string,
-  formData: unknown
+  formData: unknown,
+  overrideSession?: { user: ActionSessionUser } | null
 ): Promise<ActionResult<PlanSPK>> {
   try {
-    const session = await auth();
+    const session = overrideSession !== undefined ? overrideSession : (await auth());
     if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SPV")) {
       return {
         success: false,
@@ -180,10 +194,10 @@ export async function updateSpkStatus(
       data: { spkStatus: parsed.data.spkStatus },
     });
 
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin/prospects");
-    revalidatePath("/beranda");
-    revalidatePath("/riwayat");
+    safeRevalidatePath("/admin/dashboard");
+    safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/beranda");
+    safeRevalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateSpkStatus] Error:", error);
@@ -195,10 +209,11 @@ export async function updateSpkStatus(
 
 export async function updateKeterangan(
   planId: string,
-  formData: unknown
+  formData: unknown,
+  overrideSession?: { user: ActionSessionUser } | null
 ): Promise<ActionResult<PlanSPK>> {
   try {
-    const session = await auth();
+    const session = overrideSession !== undefined ? overrideSession : (await auth());
     if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
@@ -216,10 +231,10 @@ export async function updateKeterangan(
       data: { keterangan: parsed.data.keterangan },
     });
 
-    revalidatePath("/admin/dashboard");
-    revalidatePath("/admin/prospects");
-    revalidatePath("/beranda");
-    revalidatePath("/riwayat");
+    safeRevalidatePath("/admin/dashboard");
+    safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/beranda");
+    safeRevalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateKeterangan] Error:", error);
