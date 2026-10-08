@@ -18,10 +18,12 @@ import {
 
 export interface AdminSidebarProps {
   duplicateCount?: number;
+  salesCount?: number;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
-  duplicateCount = 3,
+  duplicateCount = 0,
+  salesCount = 8,
 }) => {
   const pathname = usePathname();
 
@@ -33,7 +35,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     },
     {
       href: "/admin/prospects",
-      label: "Data Prospek",
+      label: "Data Rencana SPK",
       icon: <FileSpreadsheet className="w-5 h-5" />,
       badge: duplicateCount > 0 ? `${duplicateCount} Duplikat` : undefined,
       badgeColor: "bg-amber-100 text-amber-900 border-amber-300 font-semibold",
@@ -42,7 +44,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       href: "/admin/team",
       label: "Tim Sales",
       icon: <Users2 className="w-5 h-5" />,
-      count: "14 Sales",
+      count: `${salesCount} Sales`,
     },
     {
       href: "/admin/settings",

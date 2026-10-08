@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import Avatar from "@/components/atoms/Avatar";
 import { Bell, Calendar, ChevronDown, Menu, Search } from "lucide-react";
@@ -16,7 +17,13 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   subtitle = "Portal Operasional Cabang UjungBatu",
   onToggleSidebar,
 }) => {
+  const { data: session } = useSession();
   const [searchVal, setSearchVal] = useState("");
+
+  const userName = session?.user?.name || "Budi Santoso";
+  const userTitle =
+    session?.user?.title ||
+    (session?.user?.role === "SPV" ? "Supervisor SPV" : "Branch Admin");
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/90 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 gap-4">
@@ -74,15 +81,15 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-600 ring-2 ring-white" />
         </button>
 
-        {/* Admin Profile */}
+        {/* Admin / SPV Profile */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-          <Avatar name="Budi Santoso" size="sm" isOnline={true} />
+          <Avatar name={userName} size="sm" isOnline={true} />
           <div className="hidden sm:block text-left">
             <p className="text-xs font-bold text-slate-900 leading-none">
-              Budi Santoso
+              {userName}
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5 leading-none">
-              Branch Admin • UjungBatu
+              {userTitle} • UjungBatu
             </p>
           </div>
         </div>

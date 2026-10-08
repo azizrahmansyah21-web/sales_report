@@ -153,13 +153,23 @@ export async function getPlanSpks(params?: {
   }
 }
 
-// ─── UPDATE SPK STATUS (Oleh SPV) ──────────────────────────────────────────
+import { auth } from "@/lib/auth";
+
+// ─── UPDATE SPK STATUS (Oleh Admin & SPV) ──────────────────────────────────
 
 export async function updateSpkStatus(
   planId: string,
   formData: unknown
 ): Promise<ActionResult<PlanSPK>> {
   try {
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SPV")) {
+      return {
+        success: false,
+        error: "Akses ditolak: Hanya Admin dan SPV yang dapat mengubah status SPK.",
+      };
+    }
+
     const parsed = updateSpkStatusSchema.safeParse(formData);
     if (!parsed.success) {
       return { success: false, error: "Status tidak valid" };
@@ -171,6 +181,9 @@ export async function updateSpkStatus(
     });
 
     revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/prospects");
+    revalidatePath("/beranda");
+    revalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateSpkStatus] Error:", error);
@@ -178,13 +191,21 @@ export async function updateSpkStatus(
   }
 }
 
-// ─── UPDATE KETERANGAN (Oleh Admin) ────────────────────────────────────────
+// ─── UPDATE KETERANGAN (Khusus Admin) ──────────────────────────────────────
 
 export async function updateKeterangan(
   planId: string,
   formData: unknown
 ): Promise<ActionResult<PlanSPK>> {
   try {
+    const session = await auth();
+    if (!session?.user || session.user.role !== "ADMIN") {
+      return {
+        success: false,
+        error: "Akses ditolak: Hanya Admin yang berwenang membuat atau mengubah catatan keterangan.",
+      };
+    }
+
     const parsed = updateKeteranganSchema.safeParse(formData);
     if (!parsed.success) {
       return { success: false, error: "Keterangan tidak valid" };
@@ -196,6 +217,9 @@ export async function updateKeterangan(
     });
 
     revalidatePath("/admin/dashboard");
+    revalidatePath("/admin/prospects");
+    revalidatePath("/beranda");
+    revalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateKeterangan] Error:", error);
@@ -229,5 +253,42 @@ export async function getDashboardStats(): Promise<ActionResult<DashboardStats>>
   } catch (error) {
     console.error("[getDashboardStats] Error:", error);
     return { success: false, error: "Gagal memuat statistik dashboard." };
+  }
+}
+
+// ─── GET CUSTOMER AUDIT TRAIL HISTORY ────────────────────────────────────
+
+export type CustomerHistoryItem = PlanSPK & {
+  sales: Pick<User, "id" | "name" | "nip" | "title" | "phone">;
+};
+
+export async function getCustomerHistory(
+  customerName: string
+): Promise<ActionResult<CustomerHistoryItem[]>> {
+  try {
+    const cleanName = customerName.trim();
+    if (!cleanName) {
+      return { success: false, error: "Nama pelanggan tidak boleh kosong." };
+    }
+
+    const plans = await prisma.planSPK.findMany({
+      where: {
+        customerName: {
+          equals: cleanName,
+          mode: "insensitive",
+        },
+      },
+      include: {
+        sales: {
+          select: { id: true, name: true, nip: true, title: true, phone: true },
+        },
+      },
+      orderBy: { planDate: "asc" },
+    });
+
+    return { success: true, data: plans };
+  } catch (error) {
+    console.error("[getCustomerHistory] Error:", error);
+    return { success: false, error: "Gagal memuat riwayat audit customer." };
   }
 }

@@ -1,35 +1,64 @@
 "use client";
 
 import React from "react";
-import { TimelineDrawerData } from "@/lib/mockData";
-import Badge from "@/components/atoms/Badge";
-import DuplicateBadge from "@/components/atoms/DuplicateBadge";
 import Avatar from "@/components/atoms/Avatar";
 import {
   X,
   Clock,
-  Phone,
   MapPin,
   Car,
-  User,
   CheckCircle2,
+  XCircle,
   AlertTriangle,
-  MessageSquare,
-  ShieldCheck,
+  FileText,
+  Users,
+  ShieldAlert,
+  Loader2,
 } from "lucide-react";
+import type { SpkStatus } from "@prisma/client";
+
+export interface TimelineDrawerPlanItem {
+  id: string;
+  customerName: string;
+  unitName: string;
+  planDate: string | Date;
+  spkStatus: SpkStatus;
+  keterangan: string | null;
+  isDuplicate: boolean;
+  isRepeatFailed: boolean;
+  createdAt: string | Date;
+  sales: {
+    id: string;
+    name: string;
+    nip: string | null;
+    title: string | null;
+    phone?: string | null;
+  };
+}
 
 export interface TimelineJourneyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  data: TimelineDrawerData | null;
+  customerName: string;
+  plans: TimelineDrawerPlanItem[];
+  isLoading?: boolean;
 }
 
 export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
   isOpen,
   onClose,
-  data,
+  customerName,
+  plans,
+  isLoading = false,
 }) => {
-  if (!isOpen || !data) return null;
+  if (!isOpen) return null;
+
+  // Identify distinct sales advisors who submitted this customer
+  const distinctSales = Array.from(new Set(plans.map((p) => p.sales.name)));
+  const isMultiSalesDispute = distinctSales.length > 1;
+  const hasPreviousFailed = plans.some(
+    (p) => p.isRepeatFailed || p.spkStatus === "BELUM_BERHASIL"
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end antialiased">
@@ -43,33 +72,24 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
       {/* Drawer Panel */}
       <div className="relative z-10 w-full max-w-lg bg-white h-full shadow-2xl flex flex-col justify-between border-l border-slate-200 overflow-hidden animate-in slide-in-from-right duration-300">
         {/* Drawer Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50/80 flex items-start justify-between gap-3">
+        <div className="p-5 border-b border-slate-200 bg-slate-50/90 flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800">
-                Audit Trail Prospek
+                Audit Trail Rencana SPK
               </span>
-              <DuplicateBadge
-                frequency={data.duplicateCount}
-                text={`${data.duplicateCount}x Riwayat Terinput`}
-                size="sm"
-              />
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                {plans.length}x Rencana Terdaftar
+              </span>
             </div>
 
             <h3 className="text-lg font-black text-slate-900 tracking-tight">
-              {data.customerName}
+              {customerName}
             </h3>
 
-            <div className="flex items-center gap-3 text-xs text-slate-600 mt-1">
-              <span className="flex items-center gap-1 font-mono">
-                <Phone className="w-3.5 h-3.5 text-slate-400" />
-                {data.customerPhone}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                {data.location}
-              </span>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span>PT Agung Automall — Cabang UjungBatu (247)</span>
             </div>
           </div>
 
@@ -77,145 +97,188 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-            aria-label="Tutup drawer"
+            aria-label="Tutup drawer riwayat"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Drawer Scrollable Content: Timeline Steps */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {/* Dispute Callout Box */}
-          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1">
-            <div className="flex items-center gap-1.5 font-bold text-amber-900">
-              <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>Deteksi Duplikasi Nomor Handphone</span>
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {isLoading ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              <p className="text-xs font-semibold">Memuat riwayat audit customer...</p>
             </div>
-            <p className="leading-relaxed">
-              Nomor ini telah didaftarkan sebanyak {data.duplicateCount} kali oleh
-              sales advisor berbeda dalam kurun waktu 40 hari terakhir. Silakan tinjau
-              touchpoint di bawah ini untuk verifikasi mediasi komisi.
-            </p>
-          </div>
-
-          {/* Timeline Touchpoint Items */}
-          <div className="space-y-6 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200">
-            {data.touchpoints.map((tp, idx) => {
-              const isLatest = idx === data.touchpoints.length - 1;
-              return (
-                <div key={tp.id} className="relative flex items-start gap-4 pl-1">
-                  {/* Step Bubble Indicator */}
-                  <div
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 z-10 ring-4 ring-white ${
-                      isLatest
-                        ? "bg-blue-600 text-white ring-blue-100"
-                        : "bg-slate-200 text-slate-700"
-                    }`}
-                  >
-                    {tp.stepNumber}
+          ) : (
+            <>
+              {/* Multi-Sales Dispute Warning Banner */}
+              {isMultiSalesDispute && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                    <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Peringatan Potensi Sengketa Lead</span>
                   </div>
+                  <p className="leading-relaxed">
+                    Customer ini terdaftar pada <strong>{distinctSales.length} sales advisor berbeda</strong> ({distinctSales.join(", ")}).
+                    Sesuai SOP cabang 247, mediasi dilakukan oleh SPV/Admin sebelum penutupan SPK.
+                  </p>
+                </div>
+              )}
 
-                  {/* Step Card Content */}
-                  <div
-                    className={`flex-1 rounded-2xl p-4 border transition-all ${
-                      isLatest
-                        ? "bg-blue-50/40 border-blue-200 shadow-xs"
-                        : "bg-white border-slate-200/90"
-                    }`}
-                  >
-                    {/* Step Title & Date */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Touchpoint {tp.stepNumber}
-                        </span>
-                        <h4 className="font-bold text-sm text-slate-900">
-                          {tp.stepTitle}
-                        </h4>
-                      </div>
+              {/* Repeat Failed Notification */}
+              {hasPreviousFailed && !isMultiSalesDispute && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-950 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>Riwayat Penundaan Closing</span>
+                  </div>
+                  <p className="leading-relaxed text-rose-800">
+                    Customer ini memiliki catatan rencana yang belum berhasil closing pada jadwal sebelumnya. Tinjau catatan evaluasi admin di bawah ini untuk melihat kendala transaksi.
+                  </p>
+                </div>
+              )}
 
-                      <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-slate-400" />
-                        {tp.date}
-                      </span>
-                    </div>
+              {/* Timeline Items List */}
+              <div className="space-y-5 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200">
+                {plans.map((item, idx) => {
+                  const isLatest = idx === plans.length - 1;
+                  const targetDate = new Date(item.planDate).toLocaleDateString(
+                    "id-ID",
+                    {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }
+                  );
+                  const inputTime = new Date(item.createdAt).toLocaleDateString(
+                    "id-ID",
+                    {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }
+                  );
 
-                    {/* Vehicle */}
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800 mb-2">
-                      <Car className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                      <span className="line-clamp-1">{tp.vehicle}</span>
-                    </div>
-
-                    {/* Notes / Description */}
-                    <p className="text-xs text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 leading-relaxed mb-3 italic">
-                      &quot;{tp.description}&quot;
-                    </p>
-
-                    {/* Sales Advisor & Status Badge */}
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={tp.salesName} size="sm" />
-                        <div>
-                          <p className="font-bold text-slate-900 leading-none">
-                            {tp.salesName}
-                          </p>
-                          <p className="text-[10px] text-slate-500 font-mono mt-0.5 leading-none">
-                            {tp.salesNpk}
-                          </p>
-                        </div>
-                      </div>
-
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                          tp.statusColor === "green"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : tp.statusColor === "amber"
-                            ? "bg-amber-50 text-amber-700 border-amber-200"
-                            : "bg-blue-50 text-blue-700 border-blue-200"
+                  return (
+                    <div
+                      key={item.id}
+                      className="relative flex items-start gap-4 pl-1"
+                    >
+                      {/* Step Number Circle */}
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 z-10 ring-4 ring-white ${
+                          item.spkStatus === "BERHASIL"
+                            ? "bg-emerald-600 text-white"
+                            : item.spkStatus === "BELUM_BERHASIL"
+                            ? "bg-rose-600 text-white"
+                            : isLatest
+                            ? "bg-blue-600 text-white"
+                            : "bg-slate-300 text-slate-700"
                         }`}
                       >
-                        {tp.statusBadge}
-                      </span>
+                        {idx + 1}
+                      </div>
+
+                      {/* Card Body */}
+                      <div
+                        className={`flex-1 rounded-2xl p-4 border transition-all space-y-2.5 ${
+                          isLatest
+                            ? "bg-blue-50/30 border-blue-200 shadow-2xs"
+                            : "bg-white border-slate-200"
+                        }`}
+                      >
+                        {/* Header: Step Info & Status Badge */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Entri ke-{idx + 1} • Target: {targetDate}
+                            </span>
+                            <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm mt-0.5">
+                              <Car className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                              <span>{item.unitName}</span>
+                            </div>
+                          </div>
+
+                          {/* Realization Status Badge */}
+                          {item.spkStatus === "BERHASIL" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>SPK Berhasil</span>
+                            </span>
+                          ) : item.spkStatus === "BELUM_BERHASIL" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-200">
+                              <XCircle className="w-3 h-3 text-rose-600" />
+                              <span>Belum Berhasil</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Menunggu</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Admin Evaluation Notes */}
+                        {item.keterangan ? (
+                          <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-700 flex items-start gap-2">
+                            <FileText className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                            <div>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                Catatan Evaluasi:
+                              </span>
+                              <p className="text-[11px] text-slate-700 leading-relaxed italic">
+                                &quot;{item.keterangan}&quot;
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-slate-400 italic">
+                            Belum ada catatan evaluasi untuk entri ini.
+                          </p>
+                        )}
+
+                        {/* Footer Info: Sales Advisor & Created Time */}
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                          <div className="flex items-center gap-2">
+                            <Avatar name={item.sales.name} size="sm" />
+                            <div>
+                              <p className="font-bold text-slate-900 leading-none">
+                                {item.sales.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 font-mono mt-0.5 leading-none">
+                                {item.sales.nip || "SALES-ATUB"} • {item.sales.title || "Sales"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] text-slate-400">
+                            Diinput: {inputTime}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Drawer Action Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-2">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                alert("Mediasi disetujui: Komisi ditetapkan split 50:50.");
-                onClose();
-              }}
-              className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Selesaikan Mediasi (Split 50:50)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                const clean = data.customerPhone.replace(/[^0-9]/g, "");
-                window.open(`https://wa.me/62${clean.slice(1)}`, "_blank");
-              }}
-              className="h-11 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
-              title="Chat WhatsApp Customer"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>WhatsApp</span>
-            </button>
-          </div>
-
-          <p className="text-[10px] text-slate-400 text-center">
-            Penyelesaian mediasi akan dicatat pada log audit DMS Branch 247.
-          </p>
+        {/* Drawer Footer */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+          <span>
+            Total <strong>{plans.length} rencana</strong> tercatat di database cabang.
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-colors"
+          >
+            Tutup
+          </button>
         </div>
       </div>
     </div>

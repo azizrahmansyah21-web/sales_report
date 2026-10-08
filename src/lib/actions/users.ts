@@ -94,7 +94,38 @@ export async function getSPVUsers(): Promise<
 
 // ─── GET SALES TEAM WITH STATS (untuk halaman tim admin/SPV) ─────────────
 
-export async function getSalesTeamWithStats() {
+export interface SalesTeamPlanItem {
+  id: string;
+  customerName: string;
+  unitName: string;
+  planDate: Date;
+  spkStatus: "PENDING" | "BERHASIL" | "BELUM_BERHASIL";
+  keterangan: string | null;
+  isDuplicate: boolean;
+  isRepeatFailed: boolean;
+  createdAt: Date;
+}
+
+export interface SalesTeamMember {
+  id: string;
+  name: string;
+  nip: string | null;
+  title: string | null;
+  phone: string | null;
+  isActive: boolean;
+  planSpks: SalesTeamPlanItem[];
+  stats: {
+    total: number;
+    berhasil: number;
+    pending: number;
+    belumBerhasil: number;
+    duplicates: number;
+    repeatFailed: number;
+    successRate: string;
+  };
+}
+
+export async function getSalesTeamWithStats(): Promise<ActionResult<SalesTeamMember[]>> {
   try {
     const users = await prisma.user.findMany({
       where: { role: "SALES", isActive: true },
@@ -107,16 +138,23 @@ export async function getSalesTeamWithStats() {
         isActive: true,
         planSpks: {
           select: {
+            id: true,
+            customerName: true,
+            unitName: true,
+            planDate: true,
             spkStatus: true,
+            keterangan: true,
             isDuplicate: true,
             isRepeatFailed: true,
+            createdAt: true,
           },
+          orderBy: { planDate: "desc" },
         },
       },
       orderBy: { name: "asc" },
     });
 
-    const withStats = users.map((u) => {
+    const withStats: SalesTeamMember[] = users.map((u) => {
       const total = u.planSpks.length;
       const berhasil = u.planSpks.filter((p) => p.spkStatus === "BERHASIL").length;
       const pending = u.planSpks.filter((p) => p.spkStatus === "PENDING").length;
@@ -132,6 +170,7 @@ export async function getSalesTeamWithStats() {
         title: u.title,
         phone: u.phone,
         isActive: u.isActive,
+        planSpks: u.planSpks as SalesTeamPlanItem[],
         stats: { total, berhasil, pending, belumBerhasil, duplicates, repeatFailed, successRate },
       };
     });
@@ -139,9 +178,9 @@ export async function getSalesTeamWithStats() {
     // Sort by closing/berhasil count descending (leaderboard)
     withStats.sort((a, b) => b.stats.berhasil - a.stats.berhasil);
 
-    return { success: true as const, data: withStats };
+    return { success: true, data: withStats };
   } catch (error) {
     console.error("[getSalesTeamWithStats] Error:", error);
-    return { success: false as const, error: "Gagal memuat data tim sales." };
+    return { success: false, error: "Gagal memuat data tim sales." };
   }
 }

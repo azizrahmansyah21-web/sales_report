@@ -9,13 +9,15 @@ export interface AdminDashboardLayoutProps {
   title?: string;
   subtitle?: string;
   duplicateCount?: number;
+  salesCount?: number;
 }
 
 export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   children,
   title = "Dashboard Analytics",
   subtitle = "Portal Operasional Cabang UjungBatu",
-  duplicateCount = 3,
+  duplicateCount = 0,
+  salesCount = 8,
 }) => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -23,7 +25,7 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
     <div className="min-h-screen bg-slate-100 flex antialiased font-sans text-slate-900">
       {/* Desktop Pinned Sidebar */}
       <div className="hidden md:block shrink-0">
-        <AdminSidebar duplicateCount={duplicateCount} />
+        <AdminSidebar duplicateCount={duplicateCount} salesCount={salesCount} />
       </div>
 
       {/* Mobile Sidebar Overlay Drawer */}
