@@ -80,8 +80,8 @@ async function runE2eSimulation() {
     const [adminUser, spvUser, salesBagus, salesRian] = await Promise.all([
       prisma.user.findFirst({ where: { role: "ADMIN", isActive: true } }),
       prisma.user.findFirst({ where: { role: "SPV", isActive: true } }),
-      prisma.user.findFirst({ where: { username: "bagus", role: "SALES" } }),
-      prisma.user.findFirst({ where: { username: "rian", role: "SALES" } }),
+      prisma.user.findFirst({ where: { username: "azis", role: "SALES" } }),
+      prisma.user.findFirst({ where: { username: "adrianto", role: "SALES" } }),
     ]);
 
     recordResult(
@@ -100,16 +100,16 @@ async function runE2eSimulation() {
 
     recordResult(
       "CP-1.3",
-      "Akun Sales Advisor (Bagus Triyanto) Tersedia",
+      "Akun Sales (Azis) Tersedia",
       !!salesBagus,
-      salesBagus ? `ID: ${salesBagus.id} | NIP: ${salesBagus.nip}` : "User sales bagus tidak ditemukan"
+      salesBagus ? `ID: ${salesBagus.id} | NIP: ${salesBagus.nip}` : "User sales azis tidak ditemukan"
     );
 
     recordResult(
       "CP-1.4",
-      "Akun Sales Advisor (Rian Pratama) Tersedia",
+      "Akun Sales (Adrianto) Tersedia",
       !!salesRian,
-      salesRian ? `ID: ${salesRian.id} | NIP: ${salesRian.nip}` : "User sales rian tidak ditemukan"
+      salesRian ? `ID: ${salesRian.id} | NIP: ${salesRian.nip}` : "User sales adrianto tidak ditemukan"
     );
 
     if (!adminUser || !spvUser || !salesBagus || !salesRian) {
