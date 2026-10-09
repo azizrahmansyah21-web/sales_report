@@ -16,6 +16,7 @@ import {
   XCircle,
   AlertTriangle,
   RotateCcw,
+  X,
 } from "lucide-react";
 
 export interface RiwayatClientProps {
@@ -33,6 +34,42 @@ export default function RiwayatClient({
 }: RiwayatClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<FilterStatus>("ALL");
+  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
+  const [selectedDate, setSelectedDate] = useState<string>("");
+
+  // Distinct available months for dropdown
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    for (const p of initialPlans) {
+      if (typeof p.planDate === "string" && (p.planDate as string).length >= 7) {
+        monthsSet.add((p.planDate as string).slice(0, 7));
+      } else {
+        const d = new Date(p.planDate);
+        if (!isNaN(d.getTime())) {
+          monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+      }
+    }
+    const now = new Date();
+    monthsSet.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    return Array.from(monthsSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((ym) => {
+        const [yearStr, monthStr] = ym.split("-");
+        const monthIndex = parseInt(monthStr, 10) - 1;
+        const monthName = monthNames[monthIndex] || monthStr;
+        return {
+          value: ym,
+          label: `${monthName} ${yearStr}`,
+        };
+      });
+  }, [initialPlans]);
 
   // Summary counts for filter tabs and top KPI pills
   const counts = useMemo(() => {
@@ -60,7 +97,7 @@ export default function RiwayatClient({
     };
   }, [initialPlans]);
 
-  // Filter plans by search keyword and selected tab
+  // Filter plans by search keyword, status tab, date, and month
   const filteredPlans = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -72,11 +109,30 @@ export default function RiwayatClient({
 
       if (!matchSearch) return false;
 
+      // Date filtering (YYYY-MM-DD)
+      const planDateStr =
+        typeof plan.planDate === "string" && (plan.planDate as string).length >= 10
+          ? (plan.planDate as string).slice(0, 10)
+          : (() => {
+              const d = new Date(plan.planDate);
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            })();
+
+      if (selectedDate && planDateStr !== selectedDate) {
+        return false;
+      }
+
+      if (selectedMonth !== "ALL" && !selectedDate) {
+        if (!planDateStr.startsWith(selectedMonth)) {
+          return false;
+        }
+      }
+
       if (statusFilter === "ALL") return true;
       if (statusFilter === "REPEAT_FAILED") return plan.isRepeatFailed || plan.isDuplicate;
       return plan.spkStatus === statusFilter;
     });
-  }, [initialPlans, searchQuery, statusFilter]);
+  }, [initialPlans, searchQuery, statusFilter, selectedDate, selectedMonth]);
 
   const filterTabs: Array<{ id: FilterStatus; label: string; count: number; icon: React.ReactNode }> = [
     {
@@ -177,6 +233,76 @@ export default function RiwayatClient({
             placeholder="Cari nama pelanggan atau tipe mobil..."
           />
 
+          {/* Quick Date & Month Filter Bar */}
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            {/* Filter Bulan Dropdown */}
+            <div className="relative flex-1 min-w-[140px]">
+              <select
+                value={selectedMonth}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value);
+                  if (selectedDate && e.target.value !== "ALL" && !selectedDate.startsWith(e.target.value)) {
+                    setSelectedDate("");
+                  }
+                }}
+                className="w-full h-10 px-3 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 cursor-pointer shadow-2xs"
+                title="Filter berdasarkan bulan rencana"
+              >
+                <option value="ALL">Semua Bulan</option>
+                {availableMonths.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter Tanggal Spesifik */}
+            <div className="flex items-center gap-1.5 h-10 px-3 rounded-xl border border-slate-300 bg-white focus-within:border-blue-600 shadow-2xs transition-colors">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  if (e.target.value) {
+                    setSelectedMonth(e.target.value.slice(0, 7));
+                  }
+                }}
+                className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                title="Pilih tanggal spesifik target SPK"
+              />
+              {selectedDate && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate("")}
+                  className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
+                  title="Hapus filter tanggal"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Reset Button (Visible when any filter is active) */}
+            {(searchQuery || statusFilter !== "ALL" || selectedMonth !== "ALL" || selectedDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("ALL");
+                  setSelectedMonth("ALL");
+                  setSelectedDate("");
+                }}
+                className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                title="Reset semua filter"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+
           {/* Filter Status Pills with Horizontal Scroll */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
             {filterTabs.map((tab) => {
@@ -225,18 +351,20 @@ export default function RiwayatClient({
                   Tidak Ada Rencana SPK
                 </h4>
                 <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
-                  {searchQuery || statusFilter !== "ALL"
+                  {searchQuery || statusFilter !== "ALL" || selectedMonth !== "ALL" || selectedDate
                     ? "Tidak ditemukan data yang sesuai dengan pencarian atau filter yang dipilih."
                     : "Belum ada rencana SPK yang dicatat. Buat rencana penutupan SPK H-1 Anda sekarang."}
                 </p>
               </div>
 
-              {searchQuery || statusFilter !== "ALL" ? (
+              {searchQuery || statusFilter !== "ALL" || selectedMonth !== "ALL" || selectedDate ? (
                 <button
                   type="button"
                   onClick={() => {
                     setSearchQuery("");
                     setStatusFilter("ALL");
+                    setSelectedMonth("ALL");
+                    setSelectedDate("");
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
                 >
