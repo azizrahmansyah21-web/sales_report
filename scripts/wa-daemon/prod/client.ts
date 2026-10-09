@@ -143,6 +143,60 @@ export async function sendGroupMessage(text: string): Promise<boolean> {
   }
 }
 
+export function getWhatsAppSocket(): WASocket | null {
+  return sock;
+}
+
+export async function sendGroupMessageWithResult(
+  text: string
+): Promise<{ success: boolean; messageId?: string; targetGroupId?: string }> {
+  const config = loadDaemonConfig();
+  const targetGroupId = config.whatsappTargetGroupId;
+
+  if (!targetGroupId) {
+    console.log(
+      "[WA Daemon] Pesan tidak dapat dikirim: WHATSAPP_TARGET_GROUP_ID belum disetel di .env."
+    );
+    return { success: false };
+  }
+
+  if (!isConnected || !sock) {
+    console.log(
+      "[WA Daemon] Pesan ditunda: Koneksi WhatsApp belum siap. Mencoba menghubungkan..."
+    );
+    await initWhatsAppClient();
+    return { success: false };
+  }
+
+  // Enforce anti-burst delay between consecutive messages
+  const elapsedSinceLastSend = Date.now() - lastSendTimestamp;
+  if (elapsedSinceLastSend < MIN_SEND_GAP_MS) {
+    const waitTime = MIN_SEND_GAP_MS - elapsedSinceLastSend;
+    await sleep(waitTime);
+  }
+
+  try {
+    // Human presence typing simulation to prevent bot detection
+    await sock.sendPresenceUpdate("composing", targetGroupId);
+    const typingDuration = 2200 + Math.floor(Math.random() * 1600);
+    await sleep(typingDuration);
+    await sock.sendPresenceUpdate("paused", targetGroupId);
+
+    // Dispatch message to WhatsApp group
+    const sent = await sock.sendMessage(targetGroupId, { text });
+    lastSendTimestamp = Date.now();
+    console.log("[WA Daemon] Pesan berhasil dikirim ke grup kantor.");
+    return {
+      success: true,
+      messageId: sent?.key?.id,
+      targetGroupId,
+    };
+  } catch (error) {
+    console.error("[WA Daemon] Gagal mengirim pesan ke grup:", error);
+    return { success: false };
+  }
+}
+
 export async function closeWhatsAppClient(): Promise<void> {
   if (sock) {
     sock.end(undefined);
