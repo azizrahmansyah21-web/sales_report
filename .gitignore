@@ -49,3 +49,7 @@ next-env.d.ts
 
 /src/generated/prisma
 prisma/seed.ts
+
+# whatsapp baileys auth session & daemon cache
+auth_info_baileys/
+.cache_*.json
