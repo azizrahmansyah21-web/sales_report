@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/lib/auth.config";
 import { loginSchema } from "@/lib/validations/auth";
@@ -11,8 +10,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "Credentials",
       credentials: {
-        identifier: { label: "Username / Email / NIP", type: "text" },
-        password: { label: "Password", type: "password" },
+        identifier: { label: "NIP / Kredensial", type: "text" },
       },
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
@@ -20,26 +18,71 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const { identifier, password } = parsed.data;
-        const normalized = identifier.toLowerCase().trim();
+        const { identifier } = parsed.data;
+        const cleanId = identifier.trim();
+        const normalized = cleanId.toLowerCase();
 
+        // 1. Khusus Bapak Administration Head: login cepat dengan "ADH"
+        if (normalized === "adh" || normalized === "admin head") {
+          const adhUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { username: "adh" },
+                { nip: "050507A403" },
+                { title: { contains: "Administration Head", mode: "insensitive" } },
+              ],
+              isActive: true,
+            },
+          });
+          if (adhUser) {
+            return {
+              id: adhUser.id,
+              name: adhUser.name,
+              email: adhUser.email,
+              username: adhUser.username,
+              role: adhUser.role,
+              title: adhUser.title,
+            };
+          }
+        }
+
+        // 2. Shortcut Supervisor: "spv" atau "spv1"
+        if (normalized === "spv" || normalized === "spv1") {
+          const spvUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { username: "spv" },
+                { username: "spv1" },
+                { nip: "101257A311" },
+              ],
+              isActive: true,
+            },
+          });
+          if (spvUser) {
+            return {
+              id: spvUser.id,
+              name: spvUser.name,
+              email: spvUser.email,
+              username: spvUser.username,
+              role: spvUser.role,
+              title: spvUser.title,
+            };
+          }
+        }
+
+        // 3. Pencarian NIP / Username / Email umum (Passwordless)
         const user = await prisma.user.findFirst({
           where: {
             OR: [
+              { nip: { equals: cleanId, mode: "insensitive" } },
               { username: { equals: normalized, mode: "insensitive" } },
               { email: { equals: normalized, mode: "insensitive" } },
-              { nip: { equals: identifier.trim(), mode: "insensitive" } },
             ],
             isActive: true,
           },
         });
 
-        if (!user || !user.password) {
-          return null;
-        }
-
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) {
+        if (!user) {
           return null;
         }
 
@@ -56,7 +99,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: 60 * 24 * 60 * 60, // 60 hari remember session
+    updateAge: 24 * 60 * 60,   // Rolling refresh tiap 24 jam
   },
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 });

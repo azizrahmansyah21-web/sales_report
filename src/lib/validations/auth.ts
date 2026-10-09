@@ -3,11 +3,10 @@ import { z } from "zod";
 export const loginSchema = z.object({
   identifier: z
     .string()
-    .min(3, "Username atau Email minimal 3 karakter")
+    .min(1, "NIP atau Kredensial wajib diisi")
     .trim(),
-  password: z
-    .string()
-    .min(6, "Password minimal 6 karakter"),
+  password: z.string().optional(),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
