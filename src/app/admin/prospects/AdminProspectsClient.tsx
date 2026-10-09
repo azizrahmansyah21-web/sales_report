@@ -68,9 +68,68 @@ export default function AdminProspectsClient({
   const [selectedSalesId, setSelectedSalesId] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const [isPending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Generate list of distinct months from plans for month dropdown filter
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    for (const p of plans) {
+      if (typeof p.planDate === "string" && p.planDate.length >= 7) {
+        monthsSet.add(p.planDate.slice(0, 7));
+      } else {
+        const d = new Date(p.planDate);
+        if (!isNaN(d.getTime())) {
+          monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+      }
+    }
+    const now = new Date();
+    monthsSet.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    ];
+
+    return Array.from(monthsSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((ym) => {
+        const [yearStr, monthStr] = ym.split("-");
+        const monthIndex = parseInt(monthStr, 10) - 1;
+        const monthName = monthNames[monthIndex] || monthStr;
+        return {
+          value: ym,
+          label: `${monthName} ${yearStr}`,
+        };
+      });
+  }, [plans]);
+
+  const handleMonthChange = (month: string) => {
+    setSelectedMonth(month);
+    if (selectedDate && month !== "ALL" && !selectedDate.startsWith(month)) {
+      setSelectedDate("");
+    }
+  };
+
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    if (date) {
+      setSelectedMonth(date.slice(0, 7));
+    }
+  };
+
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedSalesId("ALL");
+    setSelectedStatus("ALL");
+    setOnlyFlagged(false);
+    setSelectedMonth("ALL");
+    setSelectedDate("");
+  };
 
   // Modal state for Admin editing Keterangan
   const [keteranganModal, setKeteranganModal] = useState<{
@@ -151,35 +210,7 @@ export default function AdminProspectsClient({
     }
   };
 
-  // Calculate real metrics from current dataset
-  const metrics = useMemo(() => {
-    let pending = 0;
-    let berhasil = 0;
-    let belumBerhasil = 0;
-    let duplicate = 0;
-    let repeatFailed = 0;
-
-    for (const p of plans) {
-      if (p.spkStatus === "PENDING") pending++;
-      else if (p.spkStatus === "BERHASIL") berhasil++;
-      else if (p.spkStatus === "BELUM_BERHASIL") belumBerhasil++;
-
-      if (p.isDuplicate) duplicate++;
-      if (p.isRepeatFailed) repeatFailed++;
-    }
-
-    return {
-      total: plans.length,
-      pending,
-      berhasil,
-      belumBerhasil,
-      duplicate,
-      repeatFailed,
-      totalFlagged: duplicate + repeatFailed,
-    };
-  }, [plans]);
-
-  // Filter plans based on search, sales, status, and duplicate flag
+  // Filter plans based on search, sales, status, duplicate flag, date, and month
   const filteredPlans = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
 
@@ -204,9 +235,56 @@ export default function AdminProspectsClient({
         return false;
       }
 
+      // Date filtering (YYYY-MM-DD)
+      const planDateStr =
+        typeof p.planDate === "string" && p.planDate.length >= 10
+          ? p.planDate.slice(0, 10)
+          : (() => {
+              const d = new Date(p.planDate);
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            })();
+
+      if (selectedDate && planDateStr !== selectedDate) {
+        return false;
+      }
+
+      if (selectedMonth !== "ALL" && !selectedDate) {
+        if (!planDateStr.startsWith(selectedMonth)) {
+          return false;
+        }
+      }
+
       return true;
     });
-  }, [plans, searchQuery, selectedSalesId, selectedStatus, onlyFlagged]);
+  }, [plans, searchQuery, selectedSalesId, selectedStatus, onlyFlagged, selectedDate, selectedMonth]);
+
+  // Calculate real metrics from current filtered dataset
+  const metrics = useMemo(() => {
+    let pending = 0;
+    let berhasil = 0;
+    let belumBerhasil = 0;
+    let duplicate = 0;
+    let repeatFailed = 0;
+
+    for (const p of filteredPlans) {
+      if (p.spkStatus === "PENDING") pending++;
+      else if (p.spkStatus === "BERHASIL") berhasil++;
+      else if (p.spkStatus === "BELUM_BERHASIL") belumBerhasil++;
+
+      if (p.isDuplicate) duplicate++;
+      if (p.isRepeatFailed) repeatFailed++;
+    }
+
+    return {
+      total: filteredPlans.length,
+      pending,
+      berhasil,
+      belumBerhasil,
+      duplicate,
+      repeatFailed,
+      totalFlagged: duplicate + repeatFailed,
+    };
+  }, [filteredPlans]);
 
   // Handle SPK Status change (Authorized for both Admin & SPV)
   const handleStatusChange = async (planId: string, newStatus: SpkStatus) => {
@@ -424,11 +502,50 @@ export default function AdminProspectsClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filter Bulan Dropdown */}
+              <div className="relative">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => handleMonthChange(e.target.value)}
+                  className="h-11 px-3 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 cursor-pointer shadow-2xs"
+                  title="Filter berdasarkan bulan rencana SPK"
+                >
+                  <option value="ALL">Semua Bulan</option>
+                  {availableMonths.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filter Tanggal Spesifik */}
+              <div className="flex items-center gap-1.5 h-11 px-3 rounded-xl border border-slate-300 bg-white focus-within:border-blue-600 shadow-2xs transition-colors">
+                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                  title="Filter spesifik hari H rencana SPK"
+                />
+                {selectedDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDate("")}
+                    className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors"
+                    title="Hapus filter tanggal spesifik"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
               {/* Sales Advisor Dropdown Filter */}
               <select
                 value={selectedSalesId}
                 onChange={(e) => setSelectedSalesId(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600"
+                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
                 <option value="ALL">Semua Sales ({salesUsers.length} Advisor)</option>
                 {salesUsers.map((s) => (
@@ -442,7 +559,7 @@ export default function AdminProspectsClient({
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600"
+                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
                 <option value="ALL">Semua Status SPK</option>
                 <option value="PENDING">Menunggu Hari H</option>
@@ -455,7 +572,7 @@ export default function AdminProspectsClient({
                 className={`h-11 px-3 rounded-xl border flex items-center gap-2 cursor-pointer text-xs font-bold transition-all select-none ${
                   onlyFlagged
                     ? "bg-amber-100 border-amber-400 text-amber-950 shadow-2xs"
-                    : "bg-amber-50/60 border-amber-200 text-amber-800 hover:bg-amber-100/60"
+                    : "bg-amber-50/60 border-amber-200 text-amber-800 hover:bg-amber-100/60 shadow-2xs"
                 }`}
               >
                 <input
@@ -468,11 +585,24 @@ export default function AdminProspectsClient({
                 <span>Hanya Duplikat ({metrics.totalFlagged})</span>
               </label>
 
+              {/* Reset Filter Button */}
+              {(searchQuery || selectedSalesId !== "ALL" || selectedStatus !== "ALL" || onlyFlagged || selectedMonth !== "ALL" || selectedDate) && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="h-11 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                  title="Reset semua filter ke default"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset</span>
+                </button>
+              )}
+
               {/* CSV Export Button */}
               <button
                 type="button"
                 onClick={handleExportCSV}
-                className="h-11 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                className="h-11 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
                 title="Unduh data tabel dalam format CSV"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -673,12 +803,7 @@ export default function AdminProspectsClient({
                       </p>
                       <button
                         type="button"
-                        onClick={() => {
-                          setSearchQuery("");
-                          setSelectedSalesId("ALL");
-                          setSelectedStatus("ALL");
-                          setOnlyFlagged(false);
-                        }}
+                        onClick={handleResetFilters}
                         className="text-xs text-blue-600 hover:underline font-bold"
                       >
                         Reset Filter
