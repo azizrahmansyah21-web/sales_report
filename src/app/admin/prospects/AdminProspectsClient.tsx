@@ -343,7 +343,7 @@ export default function AdminProspectsClient({
       "Tanggal Plan (Hari H)",
       "Nama Pelanggan",
       "Model Toyota",
-      "Sales Advisor",
+      "Nama Sales",
       "NPK Sales",
       "Status Realisasi",
       "Duplikat",
@@ -541,13 +541,13 @@ export default function AdminProspectsClient({
                 )}
               </div>
 
-              {/* Sales Advisor Dropdown Filter */}
+              {/* Sales Dropdown Filter */}
               <select
                 value={selectedSalesId}
                 onChange={(e) => setSelectedSalesId(e.target.value)}
                 className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
-                <option value="ALL">Semua Sales ({salesUsers.length} Advisor)</option>
+                <option value="ALL">Semua Sales ({salesUsers.length} Personel)</option>
                 {salesUsers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} {s.nip ? `(${s.nip})` : ""}
@@ -621,7 +621,7 @@ export default function AdminProspectsClient({
                   <th className="py-3.5 px-4">Target Hari H</th>
                   <th className="py-3.5 px-4">Nama Pelanggan</th>
                   <th className="py-3.5 px-4">Model Unit Toyota</th>
-                  <th className="py-3.5 px-4">Sales Advisor</th>
+                  <th className="py-3.5 px-4">Sales</th>
                   <th className="py-3.5 px-4">Penanda Sistem</th>
                   <th className="py-3.5 px-4 min-w-[170px]">Status Realisasi SPK</th>
                   <th className="py-3.5 px-4 min-w-[220px]">Catatan Evaluasi (Admin)</th>
@@ -678,7 +678,7 @@ export default function AdminProspectsClient({
                           {row.unitName}
                         </td>
 
-                        {/* Sales Advisor */}
+                        {/* Sales Staff */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <p className="font-bold text-slate-800">{row.sales.name}</p>
                           <p className="text-[10px] text-slate-500 font-mono">

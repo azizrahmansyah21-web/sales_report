@@ -53,7 +53,7 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  // Identify distinct sales advisors who submitted this customer
+  // Identify distinct sales who submitted this customer
   const distinctSales = Array.from(new Set(plans.map((p) => p.sales.name)));
   const isMultiSalesDispute = distinctSales.length > 1;
   const hasPreviousFailed = plans.some(
@@ -120,7 +120,7 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
                     <span>Peringatan Potensi Sengketa Lead</span>
                   </div>
                   <p className="leading-relaxed">
-                    Customer ini terdaftar pada <strong>{distinctSales.length} sales advisor berbeda</strong> ({distinctSales.join(", ")}).
+                    Customer ini terdaftar pada <strong>{distinctSales.length} tenaga sales berbeda</strong> ({distinctSales.join(", ")}).
                     Sesuai SOP cabang 247, mediasi dilakukan oleh SPV/Admin sebelum penutupan SPK.
                   </p>
                 </div>
@@ -240,7 +240,7 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
                           </p>
                         )}
 
-                        {/* Footer Info: Sales Advisor & Created Time */}
+                        {/* Footer Info: Sales & Created Time */}
                         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
                           <div className="flex items-center gap-2">
                             <Avatar name={item.sales.name} size="sm" />

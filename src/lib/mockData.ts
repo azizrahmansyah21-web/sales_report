@@ -121,7 +121,7 @@ export const SALES_ADVISORS: SalesAdvisor[] = [
     id: "s3",
     name: "Dedi Kurniawan",
     npk: "NPK-ATUB-202204",
-    title: "Sales Advisor",
+    title: "Sales Executive",
     zone: "Pasir Pengaraian (Ibu Kota Kab. Rokan Hulu)",
     status: "Aktif Lapangan",
     prospectsCount: 35,

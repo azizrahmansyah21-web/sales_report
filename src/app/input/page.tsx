@@ -37,7 +37,7 @@ function getTodayDateString(): string {
 
 export default function InputPlanSpkPage() {
   const { data: session } = useSession();
-  const salesName = session?.user?.name || "Sales Advisor";
+  const salesName = session?.user?.name || "Sales";
   const userId = session?.user?.id;
 
   const [customerName, setCustomerName] = useState("");

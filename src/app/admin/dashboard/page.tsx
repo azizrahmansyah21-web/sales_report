@@ -12,7 +12,7 @@ export default async function AdminDashboardPage() {
     redirect("/login");
   }
 
-  // Restrict sales advisors from accessing admin portal
+  // Restrict sales team from accessing admin portal
   if (session.user.role === "SALES") {
     redirect("/beranda");
   }

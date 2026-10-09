@@ -212,7 +212,7 @@ export default function AdminSettingsPage() {
                 Tindakan Sistem Saat Duplikasi Terdeteksi
               </h4>
               <p className="text-xs text-slate-500">
-                Pilih perilaku otomatis saat nomor telepon ganda dimasukkan oleh sales advisor lain:
+                Pilih perilaku otomatis saat nomor telepon ganda dimasukkan oleh tenaga sales lain:
               </p>
 
               <div className="space-y-2 pt-1">
@@ -443,7 +443,7 @@ export default function AdminSettingsPage() {
         {/* Bottom Save Action Bar */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex items-center justify-between">
           <p className="text-xs text-slate-500">
-            Perubahan berlaku untuk seluruh Sales Advisor Cabang UjungBatu (Cabang 247).
+            Perubahan berlaku untuk seluruh Tim Sales Cabang UjungBatu (Cabang 247).
           </p>
 
           <Button

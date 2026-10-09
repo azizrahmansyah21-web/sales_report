@@ -12,8 +12,8 @@ export default async function RiwayatPage() {
   }
 
   const userId = session.user.id;
-  const salesName = session.user.name || "Sales Advisor";
-  const salesTitle = session.user.title || "Sales Advisor Lapangan";
+  const salesName = session.user.name || "Sales";
+  const salesTitle = session.user.title || "Sales Executive";
 
   // Query all Plan SPKs for the logged-in sales, latest first
   const plans = await prisma.planSPK.findMany({

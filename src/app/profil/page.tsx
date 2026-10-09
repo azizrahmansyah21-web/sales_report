@@ -12,8 +12,8 @@ export default async function ProfilPage() {
   }
 
   const userId = session.user.id;
-  const salesName = session.user.name || "Sales Advisor";
-  const salesTitle = session.user.title || "Sales Advisor Lapangan";
+  const salesName = session.user.name || "Sales";
+  const salesTitle = session.user.title || "Sales Executive";
   const salesUsername = session.user.username ? `@${session.user.username}` : "NPK-ATUB-202108";
 
   // Fetch real performance statistics for the authenticated sales

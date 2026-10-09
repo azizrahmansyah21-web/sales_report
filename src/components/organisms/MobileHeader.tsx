@@ -137,7 +137,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
                 {salesName}
               </span>
               <span className="text-[10px] text-slate-500 font-mono mt-0.5">
-                Sales Advisor
+                Tim Sales
               </span>
             </div>
           </Link>

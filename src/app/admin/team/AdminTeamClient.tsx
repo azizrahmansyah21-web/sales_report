@@ -39,7 +39,7 @@ export default function AdminTeamClient({
   const [filterTab, setFilterTab] = useState<"ALL" | "TOP" | "ATTENTION" | "PENDING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Modal inspection state for a specific sales advisor's plans
+  // Modal inspection state for a specific sales member's plans
   const [selectedMember, setSelectedMember] = useState<SalesTeamMember | null>(null);
 
   // Summary Metrics calculations
@@ -95,7 +95,7 @@ export default function AdminTeamClient({
   const handleExportCsv = () => {
     const headers = [
       "Peringkat",
-      "Nama Sales Advisor",
+      "Nama Sales",
       "NIP",
       "Jabatan",
       "No Telepon",
@@ -145,7 +145,7 @@ export default function AdminTeamClient({
   return (
     <AdminDashboardLayout
       title="Manajemen Tim Sales"
-      subtitle="Evaluasi Kinerja Sales Advisor & Akuntabilitas Target SPK H-1 Cabang 247"
+      subtitle="Evaluasi Kinerja Tim Sales & Akuntabilitas Target SPK H-1 Cabang 247"
       duplicateCount={totalDuplicates}
       salesCount={totalSales}
     >
@@ -188,7 +188,7 @@ export default function AdminTeamClient({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
           <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
-              <span>Total Advisor</span>
+              <span>Total Sales</span>
               <Users className="w-4 h-4 text-blue-600" />
             </div>
             <p className="text-2xl font-black text-slate-900 tracking-tight">
@@ -316,7 +316,7 @@ export default function AdminTeamClient({
               <thead>
                 <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-4 text-center w-12">Peringkat</th>
-                  <th className="py-3.5 px-4">Sales Advisor</th>
+                  <th className="py-3.5 px-4">Sales</th>
                   <th className="py-3.5 px-4">Kontak</th>
                   <th className="py-3.5 px-4 text-center">Total Rencana</th>
                   <th className="py-3.5 px-4 text-center">Closing Sah</th>
@@ -360,7 +360,7 @@ export default function AdminTeamClient({
                           )}
                         </td>
 
-                        {/* Advisor Profile */}
+                        {/* Sales Profile */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <Avatar name={member.name} size="md" isOnline={member.isActive} />
@@ -518,7 +518,7 @@ export default function AdminTeamClient({
                     <td colSpan={10} className="text-center py-12 text-slate-400 space-y-2">
                       <Users className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="font-semibold text-xs text-slate-600">
-                        Tidak ada sales advisor yang cocok dengan filter.
+                        Tidak ada personel sales yang cocok dengan filter.
                       </p>
                       <button
                         type="button"
@@ -552,7 +552,7 @@ export default function AdminTeamClient({
             <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700/80 space-y-1">
               <strong className="text-white block font-bold">1. Cut-off Input H-1 (08:00 WIB)</strong>
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Seluruh sales advisor wajib menginput target closing paling lambat pukul 08:00 WIB hari target SPK. Rencana yang diinput setelahnya masuk ke evaluasi khusus SPV.
+                Seluruh tim sales wajib menginput target closing paling lambat pukul 08:00 WIB hari target SPK. Rencana yang diinput setelahnya masuk ke evaluasi khusus SPV.
               </p>
             </div>
 

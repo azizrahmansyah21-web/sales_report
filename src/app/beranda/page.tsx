@@ -24,8 +24,8 @@ export default async function BerandaPage() {
   }
 
   const userId = session.user.id;
-  const salesName = session.user.name || "Sales Advisor";
-  const salesTitle = session.user.title || "Sales Advisor Lapangan";
+  const salesName = session.user.name || "Sales";
+  const salesTitle = session.user.title || "Sales Executive";
   const salesUsername = session.user.username ? `@${session.user.username}` : "";
 
   // Fetch actual operational plan SPKs and KPI stats for this authenticated sales

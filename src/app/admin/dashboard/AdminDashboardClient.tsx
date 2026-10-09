@@ -280,7 +280,7 @@ export default function AdminDashboardClient({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                    Top 5 Sales Advisor
+                    Top 5 Tim Sales
                   </h3>
                   <p className="text-xs text-slate-500">
                     Leaderboard Realisasi SPK UjungBatu
@@ -432,7 +432,7 @@ export default function AdminDashboardClient({
                 Aktivitas Rencana SPK Terbaru
               </h3>
               <p className="text-xs text-slate-500">
-                5 rencana closing H-1 terakhir yang diinput oleh sales advisor.
+                5 rencana closing H-1 terakhir yang diinput oleh tim sales.
               </p>
             </div>
 
@@ -451,7 +451,7 @@ export default function AdminDashboardClient({
                 <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
                   <th className="py-2.5 px-3">Nama Pelanggan</th>
                   <th className="py-2.5 px-3">Model Toyota</th>
-                  <th className="py-2.5 px-3">Sales Advisor</th>
+                  <th className="py-2.5 px-3">Sales</th>
                   <th className="py-2.5 px-3">Target Hari H</th>
                   <th className="py-2.5 px-3 text-center">Status Realisasi</th>
                   <th className="py-2.5 px-3 text-right">Penanda</th>
