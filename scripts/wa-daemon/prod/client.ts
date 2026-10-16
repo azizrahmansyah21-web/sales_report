@@ -188,7 +188,7 @@ export async function sendGroupMessageWithResult(
     console.log("[WA Daemon] Pesan berhasil dikirim ke grup kantor.");
     return {
       success: true,
-      messageId: sent?.key?.id,
+      messageId: sent?.key?.id ?? undefined,
       targetGroupId,
     };
   } catch (error) {
