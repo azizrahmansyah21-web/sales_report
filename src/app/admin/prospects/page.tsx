@@ -1,24 +1,37 @@
+/**
+ * Halaman Server Component: Data Rencana SPK H-1 Cabang
+ * Agung Toyota UjungBatu (Cabang 220)
+ *
+ * Halaman tunggal operasional bagi Admin, ADH, dan SPV untuk:
+ * - Memantau rencana prospek SPK seluruh sales cabang
+ * - Filter cepat [✓] Input Terbaru Hari Ini
+ * - Ekspor laporan data ke file Excel (.xlsx) sekali klik
+ * - Verifikasi status realisasi closing dan catatan evaluasi tindak lanjut
+ */
+
 import React from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { canManageRealization, getDefaultRouteForRole } from "@/lib/auth/roleRoutes";
 import AdminProspectsClient from "./AdminProspectsClient";
 
 export default async function AdminProspectsPage() {
   const session = await auth();
 
+  // Pengguna belum login diarahkan ke halaman login
   if (!session?.user) {
     redirect("/login");
   }
 
-  // Guard against non-admin / non-spv roles
-  if (session.user.role === "SALES") {
-    redirect("/beranda");
+  // Guard peran: jika tenaga SALES mencoba membuka rute ini, alihkan ke /input (mencegah redirect loop)
+  if (!canManageRealization(session.user.role)) {
+    redirect(getDefaultRouteForRole(session.user.role));
   }
 
-  const currentUserRole = (session.user.role || "ADMIN") as "ADMIN" | "SPV";
+  const currentUserRole = (session.user.role || "ADMIN") as "ADMIN" | "SPV" | "ADH";
 
-  // Fetch all plans and sales users concurrently
+  // Ambil seluruh data rencana SPK beserta relasi sales secara konkuren
   const [rawPlans, salesUsers] = await Promise.all([
     prisma.planSPK.findMany({
       include: {
@@ -28,6 +41,7 @@ export default async function AdminProspectsPage() {
             name: true,
             nip: true,
             title: true,
+            phone: true,
           },
         },
       },
@@ -44,7 +58,7 @@ export default async function AdminProspectsPage() {
     }),
   ]);
 
-  // Serialize date fields safely for Client Component
+  // Serialisasi data tanggal ke ISO String untuk Client Component
   const initialPlans = rawPlans.map((p) => ({
     id: p.id,
     customerName: p.customerName,
@@ -60,6 +74,7 @@ export default async function AdminProspectsPage() {
       name: p.sales.name,
       nip: p.sales.nip,
       title: p.sales.title,
+      phone: p.sales.phone,
     },
   }));
 

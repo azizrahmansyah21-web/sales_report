@@ -1,23 +1,51 @@
+/**
+ * Server Actions untuk Pengelolaan Rencana SPK H-1
+ * Agung Toyota UjungBatu (Cabang 220)
+ *
+ * Modul ini menangani:
+ * 1. Pendaftaran rencana SPK baru oleh Sales dengan penegakan batas waktu (cutoff) 16:00 WIB.
+ * 2. Deteksi otomatis prospek duplikat dan gagal berulang di basis data cabang.
+ * 3. Verifikasi realisasi closing dan catatan evaluasi oleh SPV, ADH, dan Admin.
+ * 4. Pengiriman notifikasi WhatsApp Group dengan proteksi serverless Vercel.
+ */
+
 "use server";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { planSpkSchema, updateSpkStatusSchema, updateKeteranganSchema } from "@/lib/validations/planSpk";
+import { auth } from "@/lib/auth";
+import {
+  planSpkSchema,
+  updateSpkStatusSchema,
+  updateKeteranganSchema,
+} from "@/lib/validations/planSpk";
+import {
+  isPastCutoff16WIB,
+  getDateStringWIB,
+  getTodayRangeWIB,
+} from "@/lib/utils/wibDate";
+import { canManageRealization } from "@/lib/auth/roleRoutes";
+import { sendPlanSpkNotification } from "@/lib/whatsapp/client";
 import { SpkStatus } from "@prisma/client";
 import type { PlanSPK, User, Prisma } from "@prisma/client";
 
-function safeRevalidatePath(path: string) {
+/**
+ * Memanggil revalidatePath secara aman di luar konteks request Next.js (misal saat unit test).
+ *
+ * @param path - Rute yang ingin di-revalidate
+ */
+function safeRevalidatePath(path: string): void {
   try {
     revalidatePath(path);
   } catch {
-    // Gracefully ignore outside Next.js request context (e.g. testing)
+    // Abaikan jika dipanggil di luar siklus HTTP Next.js
   }
 }
 
-// ─── TYPE DEFINITIONS ──────────────────────────────────────────────────────
+// ─── TIPE DATA HASIL & STATISTIK ─────────────────────────────────────────────
 
 export type PlanSpkWithUser = PlanSPK & {
-  sales: Pick<User, "id" | "name" | "nip" | "title">;
+  sales: Pick<User, "id" | "name" | "nip" | "title" | "phone">;
 };
 
 export type PaginatedPlanSpks = {
@@ -39,10 +67,28 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-// ─── CREATE PLAN SPK (H-1) ───────────────────────────────────────────────
+export interface ActionSessionUser {
+  id: string;
+  role: string;
+  name?: string | null;
+}
 
+// ─── PEMBUATAN RENCANA SPK (SALES ROLE) ──────────────────────────────────────
+
+/**
+ * Menyimpan data rencana SPK H-1 baru yang diinput oleh Sales.
+ * Menerapkan aturan operasional Cabang 220:
+ * - Jika waktu submit sudah >= 16:00 WIB dan tanggal yang dikirim adalah hari ini,
+ *   tanggal rencana otomatis dialihkan ke H+1 (esok hari).
+ * - Mendeteksi apakah nama pelanggan sudah pernah diajukan sebelumnya (duplikat).
+ * - Menandai status gagal berulang jika prospek sebelumnya berstatus BELUM_BERHASIL.
+ *
+ * @param userId - ID pengguna sales yang sedang login
+ * @param formData - Objek input dari form klien
+ * @returns Rencana SPK yang berhasil dibuat
+ */
 export async function createPlanSpk(
-  userId: string, // ID dari sales yang login
+  userId: string,
   formData: unknown
 ): Promise<ActionResult<PlanSPK>> {
   try {
@@ -55,7 +101,20 @@ export async function createPlanSpk(
     const { customerName, unitName, planDate } = parsed.data;
     const cleanCustomerName = customerName.trim();
 
-    // Deteksi duplikat: cari plan sebelumnya dengan nama customer yang sama di cabang
+    // Penegakan aturan Cutoff 16:00 WIB di sisi server
+    const todayStrWIB = getDateStringWIB(0);
+    const tomorrowStrWIB = getDateStringWIB(1);
+    let finalPlanDate = planDate;
+
+    if (isPastCutoff16WIB()) {
+      const submittedDateStr = planDate.toISOString().split("T")[0];
+      // Jika submit setelah 16:00 WIB dan memilih hari ini, alihkan ke esok hari
+      if (submittedDateStr <= todayStrWIB) {
+        finalPlanDate = new Date(`${tomorrowStrWIB}T00:00:00.000Z`);
+      }
+    }
+
+    // Deteksi duplikat: cari riwayat sebelumnya dengan nama pelanggan serupa di cabang
     const previousPlans = await prisma.planSPK.findMany({
       where: {
         customerName: {
@@ -67,39 +126,64 @@ export async function createPlanSpk(
     });
 
     const isDuplicate = previousPlans.length > 0;
-    const isRepeatFailed = previousPlans.some((p) => p.spkStatus === "BELUM_BERHASIL");
+    const isRepeatFailed = previousPlans.some(
+      (p) => p.spkStatus === "BELUM_BERHASIL"
+    );
+
+    // Ambil data sales untuk payload notifikasi
+    const salesUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
 
     const newPlan = await prisma.planSPK.create({
       data: {
         salesId: userId,
         customerName: cleanCustomerName,
         unitName: unitName.trim(),
-        planDate,
-        spkStatus: "PENDING", // Default
+        planDate: finalPlanDate,
+        spkStatus: "PENDING",
         keterangan: null,
         isDuplicate,
         isRepeatFailed,
       },
     });
 
-    safeRevalidatePath("/beranda");
-    safeRevalidatePath("/admin/dashboard");
+    // Kirim notifikasi WA secara background (graceful bypass di Vercel demo)
+    sendPlanSpkNotification({
+      customerName: cleanCustomerName,
+      unitName: unitName.trim(),
+      planDate: finalPlanDate,
+      salesName: salesUser?.name || "Sales Cabang 220",
+    }).catch((notifError) => {
+      console.error("[createPlanSpk] Kendala pengiriman notifikasi:", notifError);
+    });
+
+    safeRevalidatePath("/input");
+    safeRevalidatePath("/admin/prospects");
     return { success: true, data: newPlan };
   } catch (error) {
     console.error("[createPlanSpk] Error:", error);
-    return { success: false, error: "Gagal menyimpan plan SPK." };
+    return { success: false, error: "Gagal menyimpan rencana SPK ke basis data." };
   }
 }
 
-// ─── READ (GET ALL DENGAN PAGINASI & FILTER) ──────────────────────────────
+// ─── PENGAMBILAN DATA BERPAGINASI & FILTER ────────────────────────────────────
 
+/**
+ * Mengambil daftar rencana SPK dengan filter pencarian, status, sales, dan tanggal.
+ *
+ * @param params - Parameter filter query
+ * @returns Data rencana berpaginasi
+ */
 export async function getPlanSpks(params?: {
   page?: number;
   pageSize?: number;
   search?: string;
   status?: SpkStatus;
   salesId?: string;
-  date?: Date; // Filter by plan date
+  date?: Date;
+  todayInputOnly?: boolean;
 }): Promise<ActionResult<PaginatedPlanSpks>> {
   try {
     const page = Math.max(1, params?.page || 1);
@@ -133,16 +217,27 @@ export async function getPlanSpks(params?: {
       };
     }
 
+    // Filter khusus: Hanya data yang diinput hari ini pada zona waktu WIB
+    if (params?.todayInputOnly) {
+      const { startOfDayUTC, endOfDayUTC } = getTodayRangeWIB();
+      whereClause.createdAt = {
+        gte: startOfDayUTC,
+        lte: endOfDayUTC,
+      };
+    }
+
     const [total, data] = await Promise.all([
       prisma.planSPK.count({ where: whereClause }),
       prisma.planSPK.findMany({
         where: whereClause,
         include: {
           sales: {
-            select: { id: true, name: true, nip: true, title: true },
+            select: { id: true, name: true, nip: true, title: true, phone: true },
           },
         },
-        orderBy: { planDate: "desc" },
+        orderBy: params?.todayInputOnly
+          ? { createdAt: "desc" }
+          : { planDate: "desc" },
         skip,
         take: pageSize,
       }),
@@ -156,37 +251,38 @@ export async function getPlanSpks(params?: {
     };
   } catch (error) {
     console.error("[getPlanSpks] Error:", error);
-    return { success: false, error: "Gagal memuat data plan SPK." };
+    return { success: false, error: "Gagal memuat data rencana SPK." };
   }
 }
 
-import { auth } from "@/lib/auth";
+// ─── VERIFIKASI STATUS & CATATAN EVALUASI (SPV / ADH / ADMIN) ────────────────
 
-export interface ActionSessionUser {
-  id: string;
-  role: string;
-  name?: string | null;
-}
-
-// ─── UPDATE SPK STATUS (Oleh Admin & SPV) ──────────────────────────────────
-
+/**
+ * Memperbarui status realisasi SPK (PENDING, BERHASIL, atau BELUM_BERHASIL).
+ * Wewenang diberikan kepada ADMIN, ADH, dan SPV.
+ *
+ * @param planId - ID rencana SPK
+ * @param formData - Objek berisi status baru
+ * @param overrideSession - Opsional token sesi untuk testing
+ * @returns Data rencana SPK terupdate
+ */
 export async function updateSpkStatus(
   planId: string,
   formData: unknown,
   overrideSession?: { user: ActionSessionUser } | null
 ): Promise<ActionResult<PlanSPK>> {
   try {
-    const session = overrideSession !== undefined ? overrideSession : (await auth());
-    if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "SPV")) {
+    const session = overrideSession !== undefined ? overrideSession : await auth();
+    if (!session?.user || !canManageRealization(session.user.role)) {
       return {
         success: false,
-        error: "Akses ditolak: Hanya Admin dan SPV yang dapat mengubah status SPK.",
+        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang dapat memverifikasi status SPK.",
       };
     }
 
     const parsed = updateSpkStatusSchema.safeParse(formData);
     if (!parsed.success) {
-      return { success: false, error: "Status tidak valid" };
+      return { success: false, error: "Status realisasi yang dipilih tidak valid." };
     }
 
     const updated = await prisma.planSPK.update({
@@ -194,36 +290,41 @@ export async function updateSpkStatus(
       data: { spkStatus: parsed.data.spkStatus },
     });
 
-    safeRevalidatePath("/admin/dashboard");
+    safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
-    safeRevalidatePath("/beranda");
-    safeRevalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateSpkStatus] Error:", error);
-    return { success: false, error: "Gagal mengupdate status SPK." };
+    return { success: false, error: "Gagal memperbarui status realisasi SPK." };
   }
 }
 
-// ─── UPDATE KETERANGAN (Khusus Admin) ──────────────────────────────────────
-
+/**
+ * Memperbarui catatan evaluasi operasional rencana SPK.
+ * Wewenang diberikan kepada ADMIN, ADH, dan SPV untuk menindaklanjuti kendala sales.
+ *
+ * @param planId - ID rencana SPK
+ * @param formData - Objek berisi catatan evaluasi
+ * @param overrideSession - Opsional token sesi untuk testing
+ * @returns Data rencana SPK terupdate
+ */
 export async function updateKeterangan(
   planId: string,
   formData: unknown,
   overrideSession?: { user: ActionSessionUser } | null
 ): Promise<ActionResult<PlanSPK>> {
   try {
-    const session = overrideSession !== undefined ? overrideSession : (await auth());
-    if (!session?.user || session.user.role !== "ADMIN") {
+    const session = overrideSession !== undefined ? overrideSession : await auth();
+    if (!session?.user || !canManageRealization(session.user.role)) {
       return {
         success: false,
-        error: "Akses ditolak: Hanya Admin yang berwenang membuat atau mengubah catatan keterangan.",
+        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang berwenang mengisi catatan evaluasi.",
       };
     }
 
     const parsed = updateKeteranganSchema.safeParse(formData);
     if (!parsed.success) {
-      return { success: false, error: "Keterangan tidak valid" };
+      return { success: false, error: "Format catatan evaluasi tidak valid." };
     }
 
     const updated = await prisma.planSPK.update({
@@ -231,52 +332,65 @@ export async function updateKeterangan(
       data: { keterangan: parsed.data.keterangan },
     });
 
-    safeRevalidatePath("/admin/dashboard");
+    safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
-    safeRevalidatePath("/beranda");
-    safeRevalidatePath("/riwayat");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateKeterangan] Error:", error);
-    return { success: false, error: "Gagal menyimpan keterangan." };
+    return { success: false, error: "Gagal menyimpan catatan evaluasi operasional." };
   }
 }
 
-// ─── GET DASHBOARD STATS ──────────────────────────────────────────────────
-
-export async function getDashboardStats(): Promise<ActionResult<DashboardStats>> {
+/**
+ * Memperbarui status realisasi dan catatan evaluasi secara serentak dalam satu transaksi.
+ * Memudahkan supervisor SPV dan manajemen menginput hasil evaluasi langsung dari modal.
+ *
+ * @param planId - ID rencana SPK
+ * @param payload - Status dan catatan baru
+ * @returns Data rencana SPK terupdate
+ */
+export async function updateSpkRealization(
+  planId: string,
+  payload: { spkStatus: SpkStatus; keterangan?: string | null }
+): Promise<ActionResult<PlanSPK>> {
   try {
-    const [total, grouped, duplicateCount, repeatFailedCount] = await Promise.all([
-      prisma.planSPK.count(),
-      prisma.planSPK.groupBy({
-        by: ["spkStatus"],
-        _count: { id: true },
-      }),
-      prisma.planSPK.count({ where: { isDuplicate: true } }),
-      prisma.planSPK.count({ where: { isRepeatFailed: true } }),
-    ]);
+    const session = await auth();
+    if (!session?.user || !canManageRealization(session.user.role)) {
+      return {
+        success: false,
+        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang berwenang memperbarui realisasi.",
+      };
+    }
 
-    const byStatus = grouped.map((g) => ({
-      status: g.spkStatus as SpkStatus,
-      count: g._count.id,
-    }));
+    const updated = await prisma.planSPK.update({
+      where: { id: planId },
+      data: {
+        spkStatus: payload.spkStatus,
+        keterangan: payload.keterangan ? payload.keterangan.trim() : null,
+      },
+    });
 
-    return {
-      success: true,
-      data: { total, byStatus, duplicateCount, repeatFailedCount },
-    };
+    safeRevalidatePath("/input");
+    safeRevalidatePath("/admin/prospects");
+    return { success: true, data: updated };
   } catch (error) {
-    console.error("[getDashboardStats] Error:", error);
-    return { success: false, error: "Gagal memuat statistik dashboard." };
+    console.error("[updateSpkRealization] Error:", error);
+    return { success: false, error: "Gagal menyimpan pembaruan realisasi SPK." };
   }
 }
 
-// ─── GET CUSTOMER AUDIT TRAIL HISTORY ────────────────────────────────────
+// ─── RIWAYAT AUDIT & CLOSING SALES ───────────────────────────────────────────
 
 export type CustomerHistoryItem = PlanSPK & {
   sales: Pick<User, "id" | "name" | "nip" | "title" | "phone">;
 };
 
+/**
+ * Mengambil seluruh rekam jejak pengajuan suatu nama pelanggan untuk audit timeline.
+ *
+ * @param customerName - Nama pelanggan yang dicari
+ * @returns Daftar riwayat rencana pelanggan
+ */
 export async function getCustomerHistory(
   customerName: string
 ): Promise<ActionResult<CustomerHistoryItem[]>> {
@@ -304,6 +418,55 @@ export async function getCustomerHistory(
     return { success: true, data: plans };
   } catch (error) {
     console.error("[getCustomerHistory] Error:", error);
-    return { success: false, error: "Gagal memuat riwayat audit customer." };
+    return { success: false, error: "Gagal memuat riwayat audit pelanggan." };
+  }
+}
+
+export type SalesDealRecord = {
+  id: string;
+  customerName: string;
+  unitName: string;
+  planDate: string;
+};
+
+/**
+ * Mengambil riwayat rencana yang berhasil closing (DEAL) milik seorang sales.
+ * Ditampilkan di bawah form input sebagai Closing Motivation Card.
+ *
+ * @param salesId - ID pengguna sales
+ * @param limit - Jumlah maksimal data closing (default 7)
+ * @returns Daftar rencana closing terverifikasi
+ */
+export async function getSalesDealHistory(
+  salesId: string,
+  limit = 7
+): Promise<ActionResult<SalesDealRecord[]>> {
+  try {
+    const deals = await prisma.planSPK.findMany({
+      where: {
+        salesId,
+        spkStatus: "BERHASIL",
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        customerName: true,
+        unitName: true,
+        planDate: true,
+      },
+    });
+
+    const serialized = deals.map((d) => ({
+      id: d.id,
+      customerName: d.customerName,
+      unitName: d.unitName,
+      planDate: d.planDate.toISOString(),
+    }));
+
+    return { success: true, data: serialized };
+  } catch (error) {
+    console.error("[getSalesDealHistory] Error:", error);
+    return { success: false, error: "Gagal memuat riwayat closing berhasil." };
   }
 }

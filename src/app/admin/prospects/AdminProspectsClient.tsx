@@ -1,7 +1,18 @@
+/**
+ * Komponen Klien Tabel Data Rencana SPK H-1
+ * Agung Toyota UjungBatu (Cabang 220)
+ *
+ * Mengakomodasi kebutuhan operasional Admin, ADH, dan SPV:
+ * 1. Filter cepat [✓] Input Terbaru Hari Ini (rentang WIB dengan urutan terbaru).
+ * 2. Tombol ekspor download berkas Excel (.xlsx) sekali klik dengan format kolom lengkap.
+ * 3. Hak pengelolaan status realisasi SPK dan catatan evaluasi operasional (SPV/ADH/Admin).
+ * 4. Audit trail customer journey drawer untuk mendeteksi prospek berulang.
+ */
+
 "use client";
 
-import React, { useState, useMemo, useTransition } from "react";
-import Link from "next/link";
+import React, { useState, useMemo, useTransition, useEffect } from "react";
+import * as XLSX from "xlsx";
 import AdminDashboardLayout from "@/components/templates/AdminDashboardLayout";
 import SearchInput from "@/components/molecules/SearchInput";
 import TimelineJourneyDrawer, {
@@ -9,29 +20,33 @@ import TimelineJourneyDrawer, {
 } from "@/components/organisms/TimelineJourneyDrawer";
 import {
   updateSpkStatus,
-  updateKeterangan,
+  updateSpkRealization,
   getCustomerHistory,
 } from "@/lib/actions/planSpk";
 import type { SpkStatus } from "@prisma/client";
+import {
+  getTodayRangeWIB,
+  formatDisplayDateWIB,
+  formatWIBDateTime,
+  getDateStringWIB,
+} from "@/lib/utils/wibDate";
+import { canManageRealization } from "@/lib/auth/roleRoutes";
 import {
   Download,
   AlertTriangle,
   Clock,
   CheckCircle2,
   XCircle,
-  FileText,
-  Lock,
+  FileSpreadsheet,
   Edit3,
   Calendar,
   Layers,
-  ChevronLeft,
-  ChevronRight,
   RotateCcw,
-  User,
   Shield,
   Save,
   X,
   History,
+  Sparkles,
 } from "lucide-react";
 
 export interface PlanWithSalesUser {
@@ -49,13 +64,14 @@ export interface PlanWithSalesUser {
     name: string;
     nip: string | null;
     title: string | null;
+    phone: string | null;
   };
 }
 
 export interface AdminProspectsClientProps {
   initialPlans: PlanWithSalesUser[];
   salesUsers: Array<{ id: string; name: string; nip: string | null }>;
-  currentUserRole: "ADMIN" | "SPV";
+  currentUserRole: "ADMIN" | "SPV" | "ADH";
 }
 
 export default function AdminProspectsClient({
@@ -68,13 +84,18 @@ export default function AdminProspectsClient({
   const [selectedSalesId, setSelectedSalesId] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [todayInputOnly, setTodayInputOnly] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
   const [selectedDate, setSelectedDate] = useState<string>("");
 
   const [isPending, startTransition] = useTransition();
+  const [isExporting, setIsExporting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Generate list of distinct months from plans for month dropdown filter
+  // Wewenang realisasi dan evaluasi operasional (Admin, ADH, SPV)
+  const isAuthorized = canManageRealization(currentUserRole);
+
+  // Daftar bulan yang tersedia di dataset untuk dropdown filter
   const availableMonths = useMemo(() => {
     const monthsSet = new Set<string>();
     for (const p of plans) {
@@ -83,16 +104,30 @@ export default function AdminProspectsClient({
       } else {
         const d = new Date(p.planDate);
         if (!isNaN(d.getTime())) {
-          monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+          monthsSet.add(
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+          );
         }
       }
     }
     const now = new Date();
-    monthsSet.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+    monthsSet.add(
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    );
 
     const monthNames = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
     ];
 
     return Array.from(monthsSet)
@@ -127,26 +162,44 @@ export default function AdminProspectsClient({
     setSelectedSalesId("ALL");
     setSelectedStatus("ALL");
     setOnlyFlagged(false);
+    setTodayInputOnly(false);
     setSelectedMonth("ALL");
     setSelectedDate("");
   };
 
-  // Modal state for Admin editing Keterangan
-  const [keteranganModal, setKeteranganModal] = useState<{
+  // State modal evaluasi & realisasi terpadu
+  const [realizationModal, setRealizationModal] = useState<{
     isOpen: boolean;
     planId: string;
     customerName: string;
     unitName: string;
-    currentValue: string;
+    salesName: string;
+    targetDate: string;
+    currentStatus: SpkStatus;
+    currentKeterangan: string;
   }>({
     isOpen: false,
     planId: "",
     customerName: "",
     unitName: "",
-    currentValue: "",
+    salesName: "",
+    targetDate: "",
+    currentStatus: "PENDING",
+    currentKeterangan: "",
   });
 
-  // Drawer state for inspecting full Customer Journey history
+  // Listener tombol Escape untuk menutup modal secara aksesibel (R-32)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && realizationModal.isOpen) {
+        setRealizationModal((prev) => ({ ...prev, isOpen: false }));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [realizationModal.isOpen]);
+
+  // State drawer riwayat perjalanan pelanggan (Audit Trail)
   const [drawerState, setDrawerState] = useState<{
     isOpen: boolean;
     customerName: string;
@@ -168,7 +221,7 @@ export default function AdminProspectsClient({
         ...p,
         sales: {
           ...p.sales,
-          phone: null,
+          phone: p.sales.phone || null,
         },
       }));
 
@@ -210,11 +263,12 @@ export default function AdminProspectsClient({
     }
   };
 
-  // Filter plans based on search, sales, status, duplicate flag, date, and month
+  // Filter rencana berdasarkan filter bar, termasuk toggle Input Hari Ini
   const filteredPlans = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const { startOfDayUTC, endOfDayUTC } = getTodayRangeWIB();
 
-    return plans.filter((p) => {
+    const filtered = plans.filter((p) => {
       const matchSearch =
         q === "" ||
         p.customerName.toLowerCase().includes(q) ||
@@ -235,13 +289,24 @@ export default function AdminProspectsClient({
         return false;
       }
 
-      // Date filtering (YYYY-MM-DD)
+      // Filter khusus input hari ini (WIB)
+      if (todayInputOnly) {
+        const createdDate = new Date(p.createdAt);
+        if (createdDate < startOfDayUTC || createdDate > endOfDayUTC) {
+          return false;
+        }
+      }
+
+      // Filter tanggal target rencana
       const planDateStr =
         typeof p.planDate === "string" && p.planDate.length >= 10
           ? p.planDate.slice(0, 10)
           : (() => {
               const d = new Date(p.planDate);
-              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+                2,
+                "0"
+              )}-${String(d.getDate()).padStart(2, "0")}`;
             })();
 
       if (selectedDate && planDateStr !== selectedDate) {
@@ -256,9 +321,37 @@ export default function AdminProspectsClient({
 
       return true;
     });
-  }, [plans, searchQuery, selectedSalesId, selectedStatus, onlyFlagged, selectedDate, selectedMonth]);
 
-  // Calculate real metrics from current filtered dataset
+    // Jika filter input hari ini aktif, urutkan data terbaru di paling atas (createdAt DESC)
+    if (todayInputOnly) {
+      return [...filtered].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
+    return filtered;
+  }, [
+    plans,
+    searchQuery,
+    selectedSalesId,
+    selectedStatus,
+    onlyFlagged,
+    todayInputOnly,
+    selectedDate,
+    selectedMonth,
+  ]);
+
+  // Hitung jumlah data yang diinput hari ini untuk penanda tombol toggle
+  const todayInputsCount = useMemo(() => {
+    const { startOfDayUTC, endOfDayUTC } = getTodayRangeWIB();
+    return plans.filter((p) => {
+      const c = new Date(p.createdAt);
+      return c >= startOfDayUTC && c <= endOfDayUTC;
+    }).length;
+  }, [plans]);
+
+  // Metrik statistik dari dataset terfilter
   const metrics = useMemo(() => {
     let pending = 0;
     let berhasil = 0;
@@ -286,11 +379,13 @@ export default function AdminProspectsClient({
     };
   }, [filteredPlans]);
 
-  // Handle SPK Status change (Authorized for both Admin & SPV)
-  const handleStatusChange = async (planId: string, newStatus: SpkStatus) => {
+  // Pembaruan cepat status di baris tabel (Optimistic UI)
+  const handleQuickStatusChange = async (
+    planId: string,
+    newStatus: SpkStatus
+  ) => {
     setActionError(null);
 
-    // Optimistic UI update
     setPlans((prev) =>
       prev.map((item) =>
         item.id === planId ? { ...item, spkStatus: newStatus } : item
@@ -301,34 +396,38 @@ export default function AdminProspectsClient({
       const res = await updateSpkStatus(planId, { spkStatus: newStatus });
       if (!res.success) {
         setActionError(res.error);
-        // Rollback on failure
         setPlans(initialPlans);
       }
     });
   };
 
-  // Handle Keterangan update (Authorized exclusively for Admin)
-  const handleSaveKeterangan = async (e: React.FormEvent) => {
+  // Simpan pembaruan status & catatan evaluasi dari modal terpadu
+  const handleSaveRealization = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionError(null);
 
-    const { planId, currentValue } = keteranganModal;
+    const { planId, currentStatus, currentKeterangan } = realizationModal;
 
-    // Optimistic UI update
     setPlans((prev) =>
       prev.map((item) =>
         item.id === planId
-          ? { ...item, keterangan: currentValue.trim() || null }
+          ? {
+              ...item,
+              spkStatus: currentStatus,
+              keterangan: currentKeterangan.trim() || null,
+            }
           : item
       )
     );
 
-    setKeteranganModal((prev) => ({ ...prev, isOpen: false }));
+    setRealizationModal((prev) => ({ ...prev, isOpen: false }));
 
     startTransition(async () => {
-      const res = await updateKeterangan(planId, {
-        keterangan: currentValue.trim() || undefined,
+      const res = await updateSpkRealization(planId, {
+        spkStatus: currentStatus,
+        keterangan: currentKeterangan.trim() || null,
       });
+
       if (!res.success) {
         setActionError(res.error);
         setPlans(initialPlans);
@@ -336,51 +435,61 @@ export default function AdminProspectsClient({
     });
   };
 
-  // Quick export CSV helper
-  const handleExportCSV = () => {
-    const headers = [
-      "No",
-      "Tanggal Plan (Hari H)",
-      "Nama Pelanggan",
-      "Model Toyota",
-      "Nama Sales",
-      "NPK Sales",
-      "Status Realisasi",
-      "Duplikat",
-      "Gagal Berulang",
-      "Catatan Evaluasi",
-    ];
+  // Ekspor Excel (.xlsx) Sekali Klik menggunakan SheetJS
+  const handleExportExcel = () => {
+    setIsExporting(true);
 
-    const rows = filteredPlans.map((p, idx) => {
-      const dateStr = new Date(p.planDate).toLocaleDateString("id-ID");
-      return [
-        idx + 1,
-        `"${dateStr}"`,
-        `"${p.customerName.replace(/"/g, '""')}"`,
-        `"${p.unitName.replace(/"/g, '""')}"`,
-        `"${p.sales.name.replace(/"/g, '""')}"`,
-        `"${p.sales.nip || "-"}"`,
-        `"${p.spkStatus}"`,
-        p.isDuplicate ? "Ya" : "Tidak",
-        p.isRepeatFailed ? "Ya" : "Tidak",
-        `"${(p.keterangan || "").replace(/"/g, '""')}"`,
-      ].join(",");
-    });
+    try {
+      const rows = filteredPlans.map((p, idx) => {
+        let statusLabel = "Menunggu Hari H";
+        if (p.spkStatus === "BERHASIL") statusLabel = "SPK Berhasil (Closing)";
+        if (p.spkStatus === "BELUM_BERHASIL") statusLabel = "Belum Berhasil";
 
-    const csvContent =
-      "data:text/csv;charset=utf-8,\uFEFF" +
-      [headers.join(","), ...rows].join("\n");
+        return {
+          No: idx + 1,
+          "Tanggal Input": formatWIBDateTime(p.createdAt),
+          "Target Rencana SPK": formatDisplayDateWIB(p.planDate),
+          "Nama Sales": p.sales.name,
+          "No. HP Sales": p.sales.phone || "-",
+          "Nama Pelanggan": p.customerName,
+          "Model Kendaraan": p.unitName,
+          "Status Realisasi": statusLabel,
+          "Catatan Evaluasi Operasional": p.keterangan || "-",
+          Duplikat: p.isDuplicate ? "Ya" : "Tidak",
+          "Gagal Berulang": p.isRepeatFailed ? "Ya" : "Tidak",
+        };
+      });
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute(
-      "download",
-      `Laporan_SPK_H1_AgungToyota_${new Date().toISOString().split("T")[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      // Konfigurasi lebar kolom otomatis untuk keterbacaan optimal
+      worksheet["!cols"] = [
+        { wch: 6 }, // No
+        { wch: 22 }, // Tanggal Input
+        { wch: 18 }, // Target Rencana SPK
+        { wch: 24 }, // Nama Sales
+        { wch: 16 }, // No. HP Sales
+        { wch: 26 }, // Nama Pelanggan
+        { wch: 20 }, // Model Kendaraan
+        { wch: 24 }, // Status Realisasi
+        { wch: 38 }, // Catatan Evaluasi
+        { wch: 10 }, // Duplikat
+        { wch: 14 }, // Gagal Berulang
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Rencana SPK");
+
+      const todayStr = getDateStringWIB(0);
+      const filename = `Data_Rencana_SPK_Cabang220_${todayStr}.xlsx`;
+
+      XLSX.writeFile(workbook, filename);
+    } catch (err) {
+      console.error("[handleExportExcel] Kendala saat membuat file Excel:", err);
+      setActionError("Gagal mengunduh file Excel. Silakan coba kembali.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -391,13 +500,15 @@ export default function AdminProspectsClient({
       salesCount={salesUsers.length}
     >
       <div className="space-y-6">
-        {/* Role Notice Banner */}
+        {/* Banner Hak Akses & Status Peran */}
         <div className="rounded-2xl bg-white border border-slate-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
           <div className="flex items-center gap-3">
             <div
               className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                 currentUserRole === "ADMIN"
                   ? "bg-blue-100 text-blue-700"
+                  : currentUserRole === "ADH"
+                  ? "bg-indigo-100 text-indigo-700"
                   : "bg-purple-100 text-purple-700"
               }`}
             >
@@ -406,24 +517,19 @@ export default function AdminProspectsClient({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-800">
-                  Hak Akses: {currentUserRole === "ADMIN" ? "Branch Admin" : "Supervisor SPV"}
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    currentUserRole === "ADMIN"
-                      ? "bg-blue-50 text-blue-700 border border-blue-200"
-                      : "bg-purple-50 text-purple-700 border border-purple-200"
-                  }`}
-                >
+                  Hak Akses:{" "}
                   {currentUserRole === "ADMIN"
-                    ? "Full Access (Status & Keterangan)"
-                    : "Review Access (Ubah Status Saja)"}
+                    ? "Branch Administrator"
+                    : currentUserRole === "ADH"
+                    ? "Administration Head (ADH)"
+                    : "Supervisor Sales (SPV)"}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                  Otoritas Penuh Realisasi & Evaluasi
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                {currentUserRole === "ADMIN"
-                  ? "Anda dapat mengubah status SPK serta mengisi atau merevisi catatan evaluasi operasional."
-                  : "Anda berwenang menentukan status realisasi SPK (Berhasil / Belum Berhasil). Catatan keterangan dikelola oleh Admin."}
+                Anda berwenang memverifikasi status realisasi closing serta mengisi catatan evaluasi tindak lanjut bagi tenaga sales.
               </p>
             </div>
           </div>
@@ -436,13 +542,15 @@ export default function AdminProspectsClient({
           )}
         </div>
 
-        {/* 6 Quick Summary Metric Boxes */}
+        {/* Ringkasan Cepat 6 Kartu Metrik */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
               Total Rencana
             </span>
-            <p className="text-xl font-black text-slate-900 mt-1">{metrics.total}</p>
+            <p className="text-xl font-black text-slate-900 mt-1">
+              {metrics.total}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">Unit terdaftar</p>
           </div>
 
@@ -450,7 +558,9 @@ export default function AdminProspectsClient({
             <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
               Menunggu
             </span>
-            <p className="text-xl font-black text-amber-700 mt-1">{metrics.pending}</p>
+            <p className="text-xl font-black text-amber-700 mt-1">
+              {metrics.pending}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">Menunggu Hari H</p>
           </div>
 
@@ -458,15 +568,21 @@ export default function AdminProspectsClient({
             <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider block">
               SPK Berhasil
             </span>
-            <p className="text-xl font-black text-emerald-700 mt-1">{metrics.berhasil}</p>
-            <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Closing Sah</p>
+            <p className="text-xl font-black text-emerald-700 mt-1">
+              {metrics.berhasil}
+            </p>
+            <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
+              Closing Sah
+            </p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
             <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider block">
               Belum Berhasil
             </span>
-            <p className="text-xl font-black text-rose-700 mt-1">{metrics.belumBerhasil}</p>
+            <p className="text-xl font-black text-rose-700 mt-1">
+              {metrics.belumBerhasil}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">Tertunda closing</p>
           </div>
 
@@ -474,7 +590,9 @@ export default function AdminProspectsClient({
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
               Duplikat
             </span>
-            <p className="text-xl font-black text-slate-800 mt-1">{metrics.duplicate}</p>
+            <p className="text-xl font-black text-slate-800 mt-1">
+              {metrics.duplicate}
+            </p>
             <p className="text-[10px] text-slate-500 mt-0.5">Nama sama</p>
           </div>
 
@@ -485,12 +603,16 @@ export default function AdminProspectsClient({
               </span>
               <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
             </div>
-            <p className="text-xl font-black text-amber-950 mt-1">{metrics.repeatFailed}</p>
-            <p className="text-[10px] text-amber-800 font-semibold mt-0.5">Prioritas Evaluasi</p>
+            <p className="text-xl font-black text-amber-950 mt-1">
+              {metrics.repeatFailed}
+            </p>
+            <p className="text-[10px] text-amber-800 font-semibold mt-0.5">
+              Prioritas Evaluasi
+            </p>
           </div>
         </div>
 
-        {/* Filter & Search Toolbar */}
+        {/* Toolbar Pencarian, Filter Cepat, & Unduh Excel */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs space-y-3">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="w-full lg:w-96">
@@ -502,12 +624,30 @@ export default function AdminProspectsClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filter Cepat: Input Terbaru Hari Ini */}
+              <button
+                type="button"
+                onClick={() => setTodayInputOnly((prev) => !prev)}
+                className={`min-h-[44px] px-3.5 py-2 rounded-xl border flex items-center gap-2 text-xs font-bold transition-all cursor-pointer select-none ${
+                  todayInputOnly
+                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                    : "bg-blue-50/70 border-blue-200 text-blue-800 hover:bg-blue-100/70 shadow-2xs"
+                }`}
+                title="Tampilkan hanya data yang diinput hari ini pada jam kerja WIB"
+              >
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                <span>Input Hari Ini ({todayInputsCount})</span>
+                {todayInputOnly && (
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                )}
+              </button>
+
               {/* Filter Bulan Dropdown */}
               <div className="relative">
                 <select
                   value={selectedMonth}
                   onChange={(e) => handleMonthChange(e.target.value)}
-                  className="h-11 px-3 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 cursor-pointer shadow-2xs"
+                  className="min-h-[44px] px-3 pr-8 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 cursor-pointer shadow-2xs"
                   title="Filter berdasarkan bulan rencana SPK"
                 >
                   <option value="ALL">Semua Bulan</option>
@@ -520,7 +660,7 @@ export default function AdminProspectsClient({
               </div>
 
               {/* Filter Tanggal Spesifik */}
-              <div className="flex items-center gap-1.5 h-11 px-3 rounded-xl border border-slate-300 bg-white focus-within:border-blue-600 shadow-2xs transition-colors">
+              <div className="flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white focus-within:border-blue-600 shadow-2xs transition-colors">
                 <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <input
                   type="date"
@@ -541,13 +681,15 @@ export default function AdminProspectsClient({
                 )}
               </div>
 
-              {/* Sales Dropdown Filter */}
+              {/* Filter Personel Sales */}
               <select
                 value={selectedSalesId}
                 onChange={(e) => setSelectedSalesId(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
+                className="min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
-                <option value="ALL">Semua Sales ({salesUsers.length} Personel)</option>
+                <option value="ALL">
+                  Semua Sales ({salesUsers.length} Personel)
+                </option>
                 {salesUsers.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name} {s.nip ? `(${s.nip})` : ""}
@@ -555,11 +697,11 @@ export default function AdminProspectsClient({
                 ))}
               </select>
 
-              {/* Status Realisasi Filter */}
+              {/* Filter Status Realisasi */}
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="h-11 px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
+                className="min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
                 <option value="ALL">Semua Status SPK</option>
                 <option value="PENDING">Menunggu Hari H</option>
@@ -567,9 +709,9 @@ export default function AdminProspectsClient({
                 <option value="BELUM_BERHASIL">Belum Berhasil</option>
               </select>
 
-              {/* Flagged Filter Toggle */}
+              {/* Filter Penanda Duplikat */}
               <label
-                className={`h-11 px-3 rounded-xl border flex items-center gap-2 cursor-pointer text-xs font-bold transition-all select-none ${
+                className={`min-h-[44px] px-3 rounded-xl border flex items-center gap-2 cursor-pointer text-xs font-bold transition-all select-none ${
                   onlyFlagged
                     ? "bg-amber-100 border-amber-400 text-amber-950 shadow-2xs"
                     : "bg-amber-50/60 border-amber-200 text-amber-800 hover:bg-amber-100/60 shadow-2xs"
@@ -582,15 +724,21 @@ export default function AdminProspectsClient({
                   className="rounded border-amber-400 text-amber-600 focus:ring-amber-500"
                 />
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                <span>Hanya Duplikat ({metrics.totalFlagged})</span>
+                <span>Duplikat ({metrics.totalFlagged})</span>
               </label>
 
               {/* Reset Filter Button */}
-              {(searchQuery || selectedSalesId !== "ALL" || selectedStatus !== "ALL" || onlyFlagged || selectedMonth !== "ALL" || selectedDate) && (
+              {(searchQuery ||
+                selectedSalesId !== "ALL" ||
+                selectedStatus !== "ALL" ||
+                onlyFlagged ||
+                todayInputOnly ||
+                selectedMonth !== "ALL" ||
+                selectedDate) && (
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="h-11 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                  className="min-h-[44px] px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
                   title="Reset semua filter ke default"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -598,21 +746,24 @@ export default function AdminProspectsClient({
                 </button>
               )}
 
-              {/* CSV Export Button */}
+              {/* Tombol Download Excel Sekali Klik */}
               <button
                 type="button"
-                onClick={handleExportCSV}
-                className="h-11 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
-                title="Unduh data tabel dalam format CSV"
+                onClick={handleExportExcel}
+                disabled={isExporting || filteredPlans.length === 0}
+                className="min-h-[44px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-2 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
+                title="Unduh seluruh data terfilter ke file Excel (.xlsx)"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export CSV</span>
+                <FileSpreadsheet className="w-4 h-4 shrink-0" />
+                <span>
+                  {isExporting ? "Membuat Excel..." : "Download Excel (.xlsx)"}
+                </span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Data Table */}
+        {/* Tabel Data Rencana SPK */}
         <div className="rounded-2xl bg-white border border-slate-200/90 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -624,23 +775,15 @@ export default function AdminProspectsClient({
                   <th className="py-3.5 px-4">Sales</th>
                   <th className="py-3.5 px-4">Penanda Sistem</th>
                   <th className="py-3.5 px-4 min-w-[170px]">Status Realisasi SPK</th>
-                  <th className="py-3.5 px-4 min-w-[220px]">Catatan Evaluasi (Admin)</th>
-                  <th className="py-3.5 px-4 text-center">Audit Trail</th>
+                  <th className="py-3.5 px-4 min-w-[240px]">Catatan Evaluasi Operasional</th>
+                  <th className="py-3.5 px-4 text-center">Tindakan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredPlans.length > 0 ? (
                   filteredPlans.map((row) => {
                     const isFlagged = row.isRepeatFailed || row.isDuplicate;
-                    const dateFormatted = new Date(row.planDate).toLocaleDateString(
-                      "id-ID",
-                      {
-                        weekday: "short",
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      }
-                    );
+                    const dateFormatted = formatDisplayDateWIB(row.planDate);
 
                     return (
                       <tr
@@ -708,17 +851,17 @@ export default function AdminProspectsClient({
                           </div>
                         </td>
 
-                        {/* Status Realisasi (Editable by ADMIN & SPV) */}
+                        {/* Status Realisasi Dropdown Cepat */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <select
                             value={row.spkStatus}
                             onChange={(e) =>
-                              handleStatusChange(
+                              handleQuickStatusChange(
                                 row.id,
                                 e.target.value as SpkStatus
                               )
                             }
-                            className={`h-9 px-2.5 rounded-xl text-xs font-bold border transition-colors outline-none cursor-pointer ${
+                            className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold border transition-colors outline-none cursor-pointer ${
                               row.spkStatus === "BERHASIL"
                                 ? "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-2 focus:ring-emerald-200"
                                 : row.spkStatus === "BELUM_BERHASIL"
@@ -732,7 +875,7 @@ export default function AdminProspectsClient({
                           </select>
                         </td>
 
-                        {/* Catatan Evaluasi (Admin can edit, SPV is read-only) */}
+                        {/* Catatan Evaluasi Operasional */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-start justify-between gap-2 max-w-xs">
                             <div className="min-w-0">
@@ -742,51 +885,67 @@ export default function AdminProspectsClient({
                                 </p>
                               ) : (
                                 <span className="text-[11px] text-slate-400 italic">
-                                  Belum ada catatan
+                                  Belum ada catatan evaluasi
                                 </span>
                               )}
                             </div>
 
-                            {/* Action Button: Admin can edit, SPV has read-only badge */}
-                            {currentUserRole === "ADMIN" ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setKeteranganModal({
-                                    isOpen: true,
-                                    planId: row.id,
-                                    customerName: row.customerName,
-                                    unitName: row.unitName,
-                                    currentValue: row.keterangan || "",
-                                  })
-                                }
-                                className="p-1 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors shrink-0"
-                                title="Edit catatan evaluasi"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                            ) : (
-                              <div
-                                className="p-1 text-slate-400 shrink-0"
-                                title="Catatan hanya dapat diedit oleh Admin"
-                              >
-                                <Lock className="w-3.5 h-3.5" />
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRealizationModal({
+                                  isOpen: true,
+                                  planId: row.id,
+                                  customerName: row.customerName,
+                                  unitName: row.unitName,
+                                  salesName: row.sales.name,
+                                  targetDate: dateFormatted,
+                                  currentStatus: row.spkStatus,
+                                  currentKeterangan: row.keterangan || "",
+                                })
+                              }
+                              className="p-1 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors shrink-0 cursor-pointer"
+                              title="Perbarui status dan catatan evaluasi"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </td>
 
-                        {/* Audit Trail Action Button */}
+                        {/* Kolom Tombol Tindakan */}
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => openCustomerAudit(row.customerName)}
-                            className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors border border-blue-200 shadow-2xs"
-                            title="Buka audit trail riwayat customer"
-                          >
-                            <History className="w-3.5 h-3.5 text-blue-600" />
-                            <span>Riwayat</span>
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setRealizationModal({
+                                  isOpen: true,
+                                  planId: row.id,
+                                  customerName: row.customerName,
+                                  unitName: row.unitName,
+                                  salesName: row.sales.name,
+                                  targetDate: dateFormatted,
+                                  currentStatus: row.spkStatus,
+                                  currentKeterangan: row.keterangan || "",
+                                })
+                              }
+                              className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                              title="Buka form evaluasi realisasi"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>Evaluasi</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => openCustomerAudit(row.customerName)}
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 transition-colors border border-slate-300 shadow-2xs cursor-pointer"
+                              title="Buka audit trail rekam jejak prospek"
+                            >
+                              <History className="w-3 h-3 text-slate-600" />
+                              <span>Riwayat</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -795,16 +954,16 @@ export default function AdminProspectsClient({
                   <tr>
                     <td
                       colSpan={8}
-                      className="text-center py-10 text-slate-400 space-y-2"
+                      className="text-center py-12 text-slate-400 space-y-2"
                     >
                       <Layers className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="text-xs font-semibold text-slate-600">
-                        Tidak ada data rencana SPK yang sesuai dengan filter.
+                        Tidak ada data rencana SPK yang sesuai dengan filter pencarian.
                       </p>
                       <button
                         type="button"
                         onClick={handleResetFilters}
-                        className="text-xs text-blue-600 hover:underline font-bold"
+                        className="text-xs text-blue-600 hover:underline font-bold cursor-pointer"
                       >
                         Reset Filter
                       </button>
@@ -815,7 +974,7 @@ export default function AdminProspectsClient({
             </table>
           </div>
 
-          {/* Table Footer */}
+          {/* Footer Tabel */}
           <div className="p-4 border-t border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
             <span>
               Menampilkan <strong>{filteredPlans.length}</strong> dari{" "}
@@ -824,83 +983,157 @@ export default function AdminProspectsClient({
 
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <Calendar className="w-3.5 h-3.5" />
-              <span>Sistem Pelaporan H-1 Otomatis (08:00 WIB)</span>
+              <span>Sistem Pelaporan H-1 Otomatis Cabang 220</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Admin Modal for Editing Keterangan */}
-      {keteranganModal.isOpen && (
+      {/* Modal Evaluasi & Pembaruan Realisasi Terpadu (SPV / ADH / Admin) */}
+      {realizationModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
             onClick={() =>
-              setKeteranganModal((prev) => ({ ...prev, isOpen: false }))
+              setRealizationModal((prev) => ({ ...prev, isOpen: false }))
             }
           />
 
-          <div className="relative z-10 w-full max-w-md rounded-2xl bg-white border border-slate-200 p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            className="relative z-10 w-full max-w-lg rounded-2xl bg-white border border-slate-200 p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                  Catatan Evaluasi Operasional
+                <h3
+                  id="modal-title"
+                  className="text-sm font-black text-slate-900 tracking-tight"
+                >
+                  Evaluasi Realisasi SPK Cabang
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  {keteranganModal.customerName} • {keteranganModal.unitName}
+                  {realizationModal.customerName} ({realizationModal.unitName}) • Sales:{" "}
+                  {realizationModal.salesName}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() =>
-                  setKeteranganModal((prev) => ({ ...prev, isOpen: false }))
+                  setRealizationModal((prev) => ({ ...prev, isOpen: false }))
                 }
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Tutup dialog"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveKeterangan} className="space-y-4">
+            <form onSubmit={handleSaveRealization} className="space-y-4">
+              {/* Pilihan Status Realisasi */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Status Realisasi SPK
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRealizationModal((prev) => ({
+                        ...prev,
+                        currentStatus: "PENDING",
+                      }))
+                    }
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      realizationModal.currentStatus === "PENDING"
+                        ? "bg-amber-100 border-amber-400 text-amber-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>Menunggu</span>
+                    <span className="text-[10px] font-normal text-amber-700">Hari H</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRealizationModal((prev) => ({
+                        ...prev,
+                        currentStatus: "BERHASIL",
+                      }))
+                    }
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      realizationModal.currentStatus === "BERHASIL"
+                        ? "bg-emerald-100 border-emerald-400 text-emerald-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>SPK Berhasil</span>
+                    <span className="text-[10px] font-normal text-emerald-700">Closing Sah</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRealizationModal((prev) => ({
+                        ...prev,
+                        currentStatus: "BELUM_BERHASIL",
+                      }))
+                    }
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      realizationModal.currentStatus === "BELUM_BERHASIL"
+                        ? "bg-rose-100 border-rose-400 text-rose-900 shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>Belum Berhasil</span>
+                    <span className="text-[10px] font-normal text-rose-700">Tertunda</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Input Catatan Evaluasi Operasional */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Catatan Evaluasi / Keterangan (Admin)
+                  Catatan Evaluasi Operasional (SPV / ADH / Admin)
                 </label>
                 <textarea
                   rows={4}
-                  value={keteranganModal.currentValue}
+                  value={realizationModal.currentKeterangan}
                   onChange={(e) =>
-                    setKeteranganModal((prev) => ({
+                    setRealizationModal((prev) => ({
                       ...prev,
-                      currentValue: e.target.value,
+                      currentKeterangan: e.target.value,
                     }))
                   }
-                  placeholder="Contoh: Customer minta diskon tambahan; SPK mundur 3 hari karena berkas leasing belum lengkap..."
+                  placeholder="Contoh: Berkas leasing disetujui, tanda tangan kontrak jam 14:00 WIB; atau Customer minta penyesuaian diskon unit..."
                   className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all resize-none"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Catatan ini akan tampil di laporan evaluasi manajemen dan dapat dilihat oleh tim sales.
+                  Catatan ini akan tersimpan permanen pada audit trail dan langsung terupdate pada laporan cabang.
                 </p>
               </div>
 
+              {/* Tombol Aksi */}
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() =>
-                    setKeteranganModal((prev) => ({ ...prev, isOpen: false }))
+                    setRealizationModal((prev) => ({ ...prev, isOpen: false }))
                   }
-                  className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{isPending ? "Menyimpan..." : "Simpan Catatan"}</span>
+                  <span>{isPending ? "Menyimpan..." : "Simpan Evaluasi"}</span>
                 </button>
               </div>
             </form>
