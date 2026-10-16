@@ -7,7 +7,6 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import {
-  LayoutDashboard,
   FileSpreadsheet,
   Users2,
   Settings,
@@ -28,11 +27,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const pathname = usePathname();
 
   const navItems = [
-    {
-      href: "/admin/dashboard",
-      label: "Dashboard Analytics",
-      icon: <LayoutDashboard className="w-5 h-5" />,
-    },
     {
       href: "/admin/prospects",
       label: "Data Rencana SPK",
@@ -61,7 +55,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       <div>
         {/* Branch & Logo Header */}
         <div className="p-4 border-b border-slate-100">
-          <Link href="/admin/dashboard" className="flex items-center gap-2.5">
+          <Link href="/admin/prospects" className="flex items-center gap-2.5">
             <ToyotaLogo size="sm" />
             <div className="flex flex-col leading-none">
               <span className="font-black text-sm text-slate-900 tracking-tight">

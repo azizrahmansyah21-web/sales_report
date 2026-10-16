@@ -82,9 +82,9 @@ export default function LoginPage() {
       router.refresh();
 
       if (role === "ADMIN" || role === "SPV") {
-        router.push("/admin/dashboard");
+        router.push("/admin/prospects");
       } else {
-        router.push("/beranda");
+        router.push("/input");
       }
     } catch (err) {
       console.error("[LoginPage] Auth error:", err);

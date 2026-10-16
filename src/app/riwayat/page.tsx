@@ -1,31 +1,7 @@
-import React from "react";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import RiwayatClient from "./RiwayatClient";
 
-export default async function RiwayatPage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const userId = session.user.id;
-  const salesName = session.user.name || "Sales";
-  const salesTitle = session.user.title || "Sales Executive";
-
-  // Query all Plan SPKs for the logged-in sales, latest first
-  const plans = await prisma.planSPK.findMany({
-    where: { salesId: userId },
-    orderBy: { planDate: "desc" },
-  });
-
-  return (
-    <RiwayatClient
-      initialPlans={plans}
-      salesName={salesName}
-      salesTitle={salesTitle}
-    />
-  );
+// /riwayat has been retired per ADH revision (Oct 2026).
+// Closing history is now embedded directly on /input.
+export default function RiwayatPage() {
+  redirect("/input");
 }

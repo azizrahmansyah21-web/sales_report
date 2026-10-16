@@ -1,6 +1,16 @@
+/**
+ * Next.js Middleware Proteksi Rute & Navigasi Terpusat
+ * Agung Toyota UjungBatu (Cabang 220)
+ *
+ * Menerapkan kontrol akses berbasis peran (RBAC) menggunakan utilitas roleRoutes.
+ * Menjamin Sales tidak dapat membuka /admin/* dan diarahkan ke /input,
+ * serta Admin, ADH, dan SPV diarahkan ke /admin/prospects.
+ */
+
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
+import { getDefaultRouteForRole, canAccessAdminArea } from "@/lib/auth/roleRoutes";
 
 const { auth } = NextAuth(authConfig);
 
@@ -18,45 +28,40 @@ export default auth((req) => {
     pathname.startsWith("/riwayat") ||
     pathname.startsWith("/profil");
 
-  // Redirect authenticated user away from login pages
+  // Alihkan pengguna yang sudah terautentikasi jika mencoba membuka halaman login
   if (isAuthRoute) {
     if (isLoggedIn) {
-      if (userRole === "SALES") {
-        return NextResponse.redirect(new URL("/beranda", nextUrl));
-      }
-      return NextResponse.redirect(new URL("/admin/dashboard", nextUrl));
+      return NextResponse.redirect(new URL(getDefaultRouteForRole(userRole), nextUrl));
     }
     return NextResponse.next();
   }
 
-  // Guard sales routes against unauthenticated users and non-sales roles
+  // Proteksi rute Sales: Wajib login dan berstatus role SALES
   if (isSalesRoute) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", nextUrl));
     }
     if (userRole !== "SALES") {
-      return NextResponse.redirect(new URL("/admin/dashboard", nextUrl));
+      return NextResponse.redirect(new URL(getDefaultRouteForRole(userRole), nextUrl));
     }
     return NextResponse.next();
   }
 
-  // Guard admin routes against unauthenticated users and sales role
+  // Proteksi rute Admin/SPV/ADH: Wajib login dan bukan role SALES
   if (isAdminRoute) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", nextUrl));
     }
-    if (userRole === "SALES") {
-      return NextResponse.redirect(new URL("/beranda", nextUrl));
+    if (!canAccessAdminArea(userRole)) {
+      return NextResponse.redirect(new URL(getDefaultRouteForRole(userRole), nextUrl));
     }
     return NextResponse.next();
   }
 
-  // Root path routing
+  // Rute Root (/)
   if (pathname === "/") {
     if (isLoggedIn) {
-      return userRole === "SALES"
-        ? NextResponse.redirect(new URL("/beranda", nextUrl))
-        : NextResponse.redirect(new URL("/admin/dashboard", nextUrl));
+      return NextResponse.redirect(new URL(getDefaultRouteForRole(userRole), nextUrl));
     }
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
@@ -66,6 +71,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|icons|.*\\.png$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons|.*\\.png$).*)",
   ],
 };

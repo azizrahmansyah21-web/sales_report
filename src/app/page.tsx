@@ -9,8 +9,8 @@ export default async function HomePage() {
   }
 
   if (session.user.role === "SALES") {
-    redirect("/beranda");
+    redirect("/input");
   }
 
-  redirect("/admin/dashboard");
+  redirect("/admin/prospects");
 }
