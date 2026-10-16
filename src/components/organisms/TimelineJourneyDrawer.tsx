@@ -89,7 +89,7 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
 
             <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
               <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              <span>PT Agung Automall — Cabang UjungBatu (247)</span>
+              <span>PT Agung Automall, Cabang UjungBatu (220)</span>
             </div>
           </div>
 

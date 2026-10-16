@@ -135,7 +135,7 @@ export default function ProfilClient({
               {salesUsername} • {salesTitle}
             </p>
             <p className="text-xs text-slate-400 mt-0.5">
-              PT Agung Automall — Cabang UjungBatu (247)
+              PT Agung Automall, Cabang UjungBatu (220)
             </p>
           </div>
 
