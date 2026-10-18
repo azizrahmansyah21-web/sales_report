@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "db:index": "tsx scripts/add-lower-index.ts",
     "postinstall": "prisma generate",
     "wa:setup": "tsx scripts/wa-daemon/preprod/setup-qr.ts",
     "wa:find-groups": "tsx scripts/wa-daemon/preprod/find-groups.ts",

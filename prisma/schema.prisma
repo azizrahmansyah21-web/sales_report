@@ -69,5 +69,7 @@ model PlanSPK {
   @@index([customerName, salesId])
   @@index([isDuplicate])
   @@index([spkStatus])
+  // Functional index PostgreSQL Neon (dibuat via scripts/add-lower-index.ts):
+  // CREATE INDEX IF NOT EXISTS idx_plan_spk_customer_name_lower ON plan_spk (LOWER(customer_name));
   @@map("plan_spk")
 }
