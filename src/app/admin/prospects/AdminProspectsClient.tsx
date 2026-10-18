@@ -30,13 +30,9 @@ import {
   formatWIBDateTime,
   getDateStringWIB,
 } from "@/lib/utils/wibDate";
-import { canManageRealization } from "@/lib/auth/roleRoutes";
 import {
-  Download,
   AlertTriangle,
   Clock,
-  CheckCircle2,
-  XCircle,
   FileSpreadsheet,
   Edit3,
   Calendar,
@@ -46,7 +42,6 @@ import {
   Save,
   X,
   History,
-  Sparkles,
 } from "lucide-react";
 
 export interface PlanWithSalesUser {
@@ -92,8 +87,7 @@ export default function AdminProspectsClient({
   const [isExporting, setIsExporting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Wewenang realisasi dan evaluasi operasional (Admin, ADH, SPV)
-  const isAuthorized = canManageRealization(currentUserRole);
+
 
   // Daftar bulan yang tersedia di dataset untuk dropdown filter
   const availableMonths = useMemo(() => {
@@ -782,7 +776,6 @@ export default function AdminProspectsClient({
               <tbody className="divide-y divide-slate-100">
                 {filteredPlans.length > 0 ? (
                   filteredPlans.map((row) => {
-                    const isFlagged = row.isRepeatFailed || row.isDuplicate;
                     const dateFormatted = formatDisplayDateWIB(row.planDate);
 
                     return (

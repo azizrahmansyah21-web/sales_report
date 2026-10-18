@@ -12,7 +12,6 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  ShieldCheck,
 } from "lucide-react";
 
 export interface AdminSidebarProps {

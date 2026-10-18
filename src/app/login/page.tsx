@@ -29,8 +29,10 @@ export default function LoginPage() {
     try {
       const savedNip = localStorage.getItem("sales_remembered_nip");
       if (savedNip) {
-        setIdentifier(savedNip);
-        setRememberMe(true);
+        queueMicrotask(() => {
+          setIdentifier(savedNip);
+          setRememberMe(true);
+        });
       }
     } catch {
       // Ignore localStorage access restrictions if any

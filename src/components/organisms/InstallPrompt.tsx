@@ -23,7 +23,9 @@ export function InstallPrompt() {
       (window.navigator as unknown as { standalone?: boolean }).standalone === true;
 
     if (isStandaloneMode) {
-      setIsStandalone(true);
+      queueMicrotask(() => {
+        setIsStandalone(true);
+      });
       return;
     }
 
@@ -41,7 +43,9 @@ export function InstallPrompt() {
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice =
       /iphone|ipad|ipod/.test(userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
-    setIsIos(isIosDevice);
+    queueMicrotask(() => {
+      setIsIos(isIosDevice);
+    });
 
     if (isIosDevice) {
       // Tampilkan panduan iOS setelah 3 detik
