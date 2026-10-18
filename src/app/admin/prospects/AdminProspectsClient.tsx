@@ -19,8 +19,8 @@ import TimelineJourneyDrawer, {
   TimelineDrawerPlanItem,
 } from "@/components/organisms/TimelineJourneyDrawer";
 import {
-  updateSpkStatus,
-  updateSpkRealization,
+  updateKeteranganSpv,
+  updateSpkStatusDanAdmin,
   getCustomerHistory,
 } from "@/lib/actions/planSpk";
 import type { SpkStatus } from "@prisma/client";
@@ -51,6 +51,9 @@ export interface PlanWithSalesUser {
   planDate: string | Date;
   spkStatus: SpkStatus;
   keterangan: string | null;
+  keteranganSpv?: string | null;
+  keteranganAdmin?: string | null;
+  isUnplanned?: boolean;
   isDuplicate: boolean;
   isRepeatFailed: boolean;
   createdAt: string | Date;
@@ -170,7 +173,9 @@ export default function AdminProspectsClient({
     salesName: string;
     targetDate: string;
     currentStatus: SpkStatus;
-    currentKeterangan: string;
+    currentKeteranganSpv: string;
+    currentKeteranganAdmin: string;
+    currentIsUnplanned: boolean;
   }>({
     isOpen: false,
     planId: "",
@@ -179,7 +184,9 @@ export default function AdminProspectsClient({
     salesName: "",
     targetDate: "",
     currentStatus: "PENDING",
-    currentKeterangan: "",
+    currentKeteranganSpv: "",
+    currentKeteranganAdmin: "",
+    currentIsUnplanned: false,
   });
 
   // Listener tombol Escape untuk menutup modal secara aksesibel (R-32)
@@ -235,6 +242,9 @@ export default function AdminProspectsClient({
         planDate: item.planDate,
         spkStatus: item.spkStatus,
         keterangan: item.keterangan,
+        keteranganSpv: item.keteranganSpv,
+        keteranganAdmin: item.keteranganAdmin,
+        isUnplanned: item.isUnplanned,
         isDuplicate: item.isDuplicate,
         isRepeatFailed: item.isRepeatFailed,
         createdAt: item.createdAt,
@@ -373,11 +383,16 @@ export default function AdminProspectsClient({
     };
   }, [filteredPlans]);
 
-  // Pembaruan cepat status di baris tabel (Optimistic UI)
+  // Pembaruan cepat status di baris tabel (Optimistic UI - Khusus Admin & ADH)
   const handleQuickStatusChange = async (
     planId: string,
     newStatus: SpkStatus
   ) => {
+    if (currentUserRole === "SPV") {
+      setActionError("Akses ditolak: Supervisor (SPV) tidak memiliki wewenang untuk mengubah status SPK.");
+      return;
+    }
+
     setActionError(null);
 
     setPlans((prev) =>
@@ -387,7 +402,7 @@ export default function AdminProspectsClient({
     );
 
     startTransition(async () => {
-      const res = await updateSpkStatus(planId, { spkStatus: newStatus });
+      const res = await updateSpkStatusDanAdmin(planId, { spkStatus: newStatus });
       if (!res.success) {
         setActionError(res.error);
         setPlans(initialPlans);
@@ -395,41 +410,77 @@ export default function AdminProspectsClient({
     });
   };
 
-  // Simpan pembaruan status & catatan evaluasi dari modal terpadu
+  // Simpan pembaruan status & catatan evaluasi terpisah dari modal terpadu
   const handleSaveRealization = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionError(null);
 
-    const { planId, currentStatus, currentKeterangan } = realizationModal;
+    const {
+      planId,
+      currentStatus,
+      currentKeteranganSpv,
+      currentKeteranganAdmin,
+      currentIsUnplanned,
+    } = realizationModal;
 
-    setPlans((prev) =>
-      prev.map((item) =>
-        item.id === planId
-          ? {
-              ...item,
-              spkStatus: currentStatus,
-              keterangan: currentKeterangan.trim() || null,
-            }
-          : item
-      )
-    );
+    if (currentUserRole === "SPV") {
+      // Supervisor hanya memperbarui Catatan SPV
+      setPlans((prev) =>
+        prev.map((item) =>
+          item.id === planId
+            ? {
+                ...item,
+                keteranganSpv: currentKeteranganSpv.trim() || null,
+              }
+            : item
+        )
+      );
 
-    setRealizationModal((prev) => ({ ...prev, isOpen: false }));
+      setRealizationModal((prev) => ({ ...prev, isOpen: false }));
 
-    startTransition(async () => {
-      const res = await updateSpkRealization(planId, {
-        spkStatus: currentStatus,
-        keterangan: currentKeterangan.trim() || null,
+      startTransition(async () => {
+        const res = await updateKeteranganSpv(planId, {
+          keteranganSpv: currentKeteranganSpv.trim() || null,
+        });
+
+        if (!res.success) {
+          setActionError(res.error);
+          setPlans(initialPlans);
+        }
       });
+    } else {
+      // Admin & ADH memperbarui status realisasi, catatan admin, dan status unplanned
+      setPlans((prev) =>
+        prev.map((item) =>
+          item.id === planId
+            ? {
+                ...item,
+                spkStatus: currentStatus,
+                keteranganAdmin: currentKeteranganAdmin.trim() || null,
+                isUnplanned: currentIsUnplanned,
+              }
+            : item
+        )
+      );
 
-      if (!res.success) {
-        setActionError(res.error);
-        setPlans(initialPlans);
-      }
-    });
+      setRealizationModal((prev) => ({ ...prev, isOpen: false }));
+
+      startTransition(async () => {
+        const res = await updateSpkStatusDanAdmin(planId, {
+          spkStatus: currentStatus,
+          keteranganAdmin: currentKeteranganAdmin.trim() || null,
+          isUnplanned: currentIsUnplanned,
+        });
+
+        if (!res.success) {
+          setActionError(res.error);
+          setPlans(initialPlans);
+        }
+      });
+    }
   };
 
-  // Ekspor Excel (.xlsx) Sekali Klik menggunakan SheetJS
+  // Ekspor Excel (.xlsx) Sekali Klik menggunakan SheetJS dengan kolom Catatan Terpisah
   const handleExportExcel = () => {
     setIsExporting(true);
 
@@ -448,7 +499,9 @@ export default function AdminProspectsClient({
           "Nama Pelanggan": p.customerName,
           "Model Kendaraan": p.unitName,
           "Status Realisasi": statusLabel,
-          "Catatan Evaluasi Operasional": p.keterangan || "-",
+          "SPK Unplanned": p.isUnplanned ? "Ya" : "Tidak",
+          "Catatan SPV": p.keteranganSpv || "-",
+          "Catatan Admin": p.keteranganAdmin || p.keterangan || "-",
           Duplikat: p.isDuplicate ? "Ya" : "Tidak",
           "Gagal Berulang": p.isRepeatFailed ? "Ya" : "Tidak",
         };
@@ -466,7 +519,9 @@ export default function AdminProspectsClient({
         { wch: 26 }, // Nama Pelanggan
         { wch: 20 }, // Model Kendaraan
         { wch: 24 }, // Status Realisasi
-        { wch: 38 }, // Catatan Evaluasi
+        { wch: 14 }, // SPK Unplanned
+        { wch: 32 }, // Catatan SPV
+        { wch: 32 }, // Catatan Admin
         { wch: 10 }, // Duplikat
         { wch: 14 }, // Gagal Berulang
       ];
@@ -768,8 +823,9 @@ export default function AdminProspectsClient({
                   <th className="py-3.5 px-4">Model Unit Toyota</th>
                   <th className="py-3.5 px-4">Sales</th>
                   <th className="py-3.5 px-4">Penanda Sistem</th>
-                  <th className="py-3.5 px-4 min-w-[170px]">Status Realisasi SPK</th>
-                  <th className="py-3.5 px-4 min-w-[240px]">Catatan Evaluasi Operasional</th>
+                  <th className="py-3.5 px-4 min-w-[160px]">Status Realisasi SPK</th>
+                  <th className="py-3.5 px-4 min-w-[200px]">Catatan (SPV)</th>
+                  <th className="py-3.5 px-4 min-w-[200px]">Catatan (Admin)</th>
                   <th className="py-3.5 px-4 text-center">Tindakan</th>
                 </tr>
               </thead>
@@ -825,6 +881,11 @@ export default function AdminProspectsClient({
                         {/* Flags / Markers */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="flex items-center gap-1">
+                            {row.isUnplanned && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
+                                Unplanned
+                              </span>
+                            )}
                             {row.isRepeatFailed && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-950 border border-amber-300">
                                 <AlertTriangle className="w-3 h-3 text-amber-700" />
@@ -836,7 +897,7 @@ export default function AdminProspectsClient({
                                 Duplikat
                               </span>
                             )}
-                            {!row.isDuplicate && !row.isRepeatFailed && (
+                            {!row.isDuplicate && !row.isRepeatFailed && !row.isUnplanned && (
                               <span className="text-[11px] text-slate-400 font-medium">
                                 Normal
                               </span>
@@ -844,64 +905,77 @@ export default function AdminProspectsClient({
                           </div>
                         </td>
 
-                        {/* Status Realisasi Dropdown Cepat */}
+                        {/* Status Realisasi: Read-only untuk SPV, Dropdown untuk Admin/ADH */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <select
-                            value={row.spkStatus}
-                            onChange={(e) =>
-                              handleQuickStatusChange(
-                                row.id,
-                                e.target.value as SpkStatus
-                              )
-                            }
-                            className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold border transition-colors outline-none cursor-pointer ${
-                              row.spkStatus === "BERHASIL"
-                                ? "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-2 focus:ring-emerald-200"
-                                : row.spkStatus === "BELUM_BERHASIL"
-                                ? "bg-rose-50 text-rose-800 border-rose-300 focus:ring-2 focus:ring-rose-200"
-                                : "bg-amber-50 text-amber-800 border-amber-300 focus:ring-2 focus:ring-amber-200"
-                            }`}
-                          >
-                            <option value="PENDING">Menunggu Hari H</option>
-                            <option value="BERHASIL">SPK Berhasil</option>
-                            <option value="BELUM_BERHASIL">Belum Berhasil</option>
-                          </select>
+                          {currentUserRole === "SPV" ? (
+                            row.spkStatus === "BERHASIL" ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                SPK Berhasil
+                              </span>
+                            ) : row.spkStatus === "BELUM_BERHASIL" ? (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                                Belum Berhasil
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                Menunggu Hari H
+                              </span>
+                            )
+                          ) : (
+                            <select
+                              value={row.spkStatus}
+                              onChange={(e) =>
+                                handleQuickStatusChange(
+                                  row.id,
+                                  e.target.value as SpkStatus
+                                )
+                              }
+                              className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold border transition-colors outline-none cursor-pointer ${
+                                row.spkStatus === "BERHASIL"
+                                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 focus:ring-2 focus:ring-emerald-200"
+                                  : row.spkStatus === "BELUM_BERHASIL"
+                                  ? "bg-rose-50 text-rose-800 border-rose-300 focus:ring-2 focus:ring-rose-200"
+                                  : "bg-amber-50 text-amber-800 border-amber-300 focus:ring-2 focus:ring-amber-200"
+                              }`}
+                            >
+                              <option value="PENDING">Menunggu Hari H</option>
+                              <option value="BERHASIL">SPK Berhasil</option>
+                              <option value="BELUM_BERHASIL">Belum Berhasil</option>
+                            </select>
+                          )}
                         </td>
 
-                        {/* Catatan Evaluasi Operasional */}
+                        {/* Catatan SPV */}
                         <td className="py-3.5 px-4">
-                          <div className="flex items-start justify-between gap-2 max-w-xs">
-                            <div className="min-w-0">
-                              {row.keterangan ? (
-                                <p className="text-xs text-slate-700 leading-snug break-words">
-                                  {row.keterangan}
-                                </p>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 italic">
-                                  Belum ada catatan evaluasi
-                                </span>
-                              )}
-                            </div>
+                          <div className="max-w-[200px]">
+                            {row.keteranganSpv ? (
+                              <p className="text-xs text-purple-950 font-medium leading-snug break-words">
+                                {row.keteranganSpv}
+                              </p>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Belum ada catatan
+                              </span>
+                            )}
+                          </div>
+                        </td>
 
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setRealizationModal({
-                                  isOpen: true,
-                                  planId: row.id,
-                                  customerName: row.customerName,
-                                  unitName: row.unitName,
-                                  salesName: row.sales.name,
-                                  targetDate: dateFormatted,
-                                  currentStatus: row.spkStatus,
-                                  currentKeterangan: row.keterangan || "",
-                                })
-                              }
-                              className="p-1 rounded-lg text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors shrink-0 cursor-pointer"
-                              title="Perbarui status dan catatan evaluasi"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
+                        {/* Catatan Admin */}
+                        <td className="py-3.5 px-4">
+                          <div className="max-w-[200px]">
+                            {row.keteranganAdmin ? (
+                              <p className="text-xs text-slate-800 font-medium leading-snug break-words">
+                                {row.keteranganAdmin}
+                              </p>
+                            ) : row.keterangan ? (
+                              <p className="text-xs text-slate-500 italic leading-snug break-words">
+                                {row.keterangan}
+                              </p>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Belum ada catatan
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -919,14 +993,21 @@ export default function AdminProspectsClient({
                                   salesName: row.sales.name,
                                   targetDate: dateFormatted,
                                   currentStatus: row.spkStatus,
-                                  currentKeterangan: row.keterangan || "",
+                                  currentKeteranganSpv: row.keteranganSpv || "",
+                                  currentKeteranganAdmin:
+                                    row.keteranganAdmin || row.keterangan || "",
+                                  currentIsUnplanned: !!row.isUnplanned,
                                 })
                               }
                               className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
-                              title="Buka form evaluasi realisasi"
+                              title={
+                                currentUserRole === "SPV"
+                                  ? "Isi Catatan Supervisi SPV"
+                                  : "Verifikasi Status Realisasi & Catatan Admin"
+                              }
                             >
                               <Edit3 className="w-3 h-3" />
-                              <span>Evaluasi</span>
+                              <span>{currentUserRole === "SPV" ? "Catatan SPV" : "Evaluasi"}</span>
                             </button>
 
                             <button
@@ -946,7 +1027,7 @@ export default function AdminProspectsClient({
                 ) : (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="text-center py-12 text-slate-400 space-y-2"
                     >
                       <Layers className="w-8 h-8 text-slate-300 mx-auto" />
@@ -1025,24 +1106,37 @@ export default function AdminProspectsClient({
             </div>
 
             <form onSubmit={handleSaveRealization} className="space-y-4">
-              {/* Pilihan Status Realisasi */}
+              {/* Pilihan Status Realisasi SPK */}
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                  Status Realisasi SPK
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Status Realisasi SPK
+                  </label>
+                  {currentUserRole === "SPV" && (
+                    <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      Terkunci: Wewenang Admin / ADH
+                    </span>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
+                    disabled={currentUserRole === "SPV"}
                     onClick={() =>
                       setRealizationModal((prev) => ({
                         ...prev,
                         currentStatus: "PENDING",
                       }))
                     }
-                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center ${
                       realizationModal.currentStatus === "PENDING"
-                        ? "bg-amber-100 border-amber-400 text-amber-900 shadow-xs"
+                        ? "bg-amber-100 border-amber-400 text-amber-900 shadow-xs ring-1 ring-amber-400"
                         : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    } ${
+                      currentUserRole === "SPV"
+                        ? "opacity-60 cursor-not-allowed"
+                        : "cursor-pointer"
                     }`}
                   >
                     <span>Menunggu</span>
@@ -1051,16 +1145,21 @@ export default function AdminProspectsClient({
 
                   <button
                     type="button"
+                    disabled={currentUserRole === "SPV"}
                     onClick={() =>
                       setRealizationModal((prev) => ({
                         ...prev,
                         currentStatus: "BERHASIL",
                       }))
                     }
-                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center ${
                       realizationModal.currentStatus === "BERHASIL"
-                        ? "bg-emerald-100 border-emerald-400 text-emerald-900 shadow-xs"
+                        ? "bg-emerald-100 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
                         : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    } ${
+                      currentUserRole === "SPV"
+                        ? "opacity-60 cursor-not-allowed"
+                        : "cursor-pointer"
                     }`}
                   >
                     <span>SPK Berhasil</span>
@@ -1069,44 +1168,103 @@ export default function AdminProspectsClient({
 
                   <button
                     type="button"
+                    disabled={currentUserRole === "SPV"}
                     onClick={() =>
                       setRealizationModal((prev) => ({
                         ...prev,
                         currentStatus: "BELUM_BERHASIL",
                       }))
                     }
-                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center ${
                       realizationModal.currentStatus === "BELUM_BERHASIL"
-                        ? "bg-rose-100 border-rose-400 text-rose-900 shadow-xs"
+                        ? "bg-rose-100 border-rose-400 text-rose-900 shadow-xs ring-1 ring-rose-400"
                         : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    } ${
+                      currentUserRole === "SPV"
+                        ? "opacity-60 cursor-not-allowed"
+                        : "cursor-pointer"
                     }`}
                   >
                     <span>Belum Berhasil</span>
                     <span className="text-[10px] font-normal text-rose-700">Tertunda</span>
                   </button>
                 </div>
+
+                {/* Checkbox SPK Unplanned (Khusus Admin / ADH) */}
+                {currentUserRole !== "SPV" && (
+                  <label className="mt-2.5 flex items-center gap-2 p-2 rounded-xl bg-purple-50/60 border border-purple-200/80 cursor-pointer text-xs font-semibold text-purple-900">
+                    <input
+                      type="checkbox"
+                      checked={realizationModal.currentIsUnplanned}
+                      onChange={(e) =>
+                        setRealizationModal((prev) => ({
+                          ...prev,
+                          currentIsUnplanned: e.target.checked,
+                        }))
+                      }
+                      className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>Tandai sebagai SPK Unplanned (Closing tanpa input rencana H-1)</span>
+                  </label>
+                )}
               </div>
 
-              {/* Input Catatan Evaluasi Operasional */}
+              {/* Bagian Catatan SPV (Supervisor) */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Catatan Evaluasi Operasional (SPV / ADH / Admin)
+                  Catatan Supervisi SPV {currentUserRole === "SPV" && <span className="text-purple-600">(Aktif)</span>}
                 </label>
-                <textarea
-                  rows={4}
-                  value={realizationModal.currentKeterangan}
-                  onChange={(e) =>
-                    setRealizationModal((prev) => ({
-                      ...prev,
-                      currentKeterangan: e.target.value,
-                    }))
-                  }
-                  placeholder="Contoh: Berkas leasing disetujui, tanda tangan kontrak jam 14:00 WIB; atau Customer minta penyesuaian diskon unit..."
-                  className="w-full p-3 rounded-xl border border-slate-300 text-xs focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 outline-none transition-all resize-none"
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Catatan ini akan tersimpan permanen pada audit trail dan langsung terupdate pada laporan cabang.
-                </p>
+                {currentUserRole === "SPV" ? (
+                  <textarea
+                    rows={3}
+                    value={realizationModal.currentKeteranganSpv}
+                    onChange={(e) =>
+                      setRealizationModal((prev) => ({
+                        ...prev,
+                        currentKeteranganSpv: e.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Prospek butuh follow-up diskon fleet, jadwalkan test drive ulang jam 10..."
+                    className="w-full p-3 rounded-xl border border-purple-300 bg-white text-xs focus:ring-2 focus:ring-purple-500/20 outline-none transition-all resize-none font-medium"
+                  />
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                    {realizationModal.currentKeteranganSpv ? (
+                      <p className="italic text-purple-950">&quot;{realizationModal.currentKeteranganSpv}&quot;</p>
+                    ) : (
+                      <span className="text-slate-400 italic">Belum ada catatan dari Supervisor.</span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Bagian Catatan Admin (Verifikasi Dokumen & Closing) */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Catatan Administrasi & Closing (Admin/ADH) {currentUserRole !== "SPV" && <span className="text-blue-600">(Aktif)</span>}
+                </label>
+                {currentUserRole !== "SPV" ? (
+                  <textarea
+                    rows={3}
+                    value={realizationModal.currentKeteranganAdmin}
+                    onChange={(e) =>
+                      setRealizationModal((prev) => ({
+                        ...prev,
+                        currentKeteranganAdmin: e.target.value,
+                      }))
+                    }
+                    placeholder="Contoh: Berkas leasing ACC disetujui, tanda jadi Rp 5jt terverifikasi kasir..."
+                    className="w-full p-3 rounded-xl border border-blue-300 bg-white text-xs focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none font-medium"
+                  />
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                    {realizationModal.currentKeteranganAdmin ? (
+                      <p className="italic text-slate-800">&quot;{realizationModal.currentKeteranganAdmin}&quot;</p>
+                    ) : (
+                      <span className="text-slate-400 italic">Belum ada catatan verifikasi admin.</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Tombol Aksi */}
@@ -1126,7 +1284,13 @@ export default function AdminProspectsClient({
                   className="min-h-[44px] px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>{isPending ? "Menyimpan..." : "Simpan Evaluasi"}</span>
+                  <span>
+                    {isPending
+                      ? "Menyimpan..."
+                      : currentUserRole === "SPV"
+                      ? "Simpan Catatan SPV"
+                      : "Simpan Verifikasi Realisasi"}
+                  </span>
                 </button>
               </div>
             </form>

@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import type { User, Role } from "@prisma/client";
+import type { User } from "@prisma/client";
 
 export type UserProfile = Omit<User, "password">;
 
@@ -101,6 +101,9 @@ export interface SalesTeamPlanItem {
   planDate: Date;
   spkStatus: "PENDING" | "BERHASIL" | "BELUM_BERHASIL";
   keterangan: string | null;
+  keteranganSpv?: string | null;
+  keteranganAdmin?: string | null;
+  isUnplanned?: boolean;
   isDuplicate: boolean;
   isRepeatFailed: boolean;
   createdAt: Date;
@@ -119,6 +122,7 @@ export interface SalesTeamMember {
     berhasil: number;
     pending: number;
     belumBerhasil: number;
+    unplanned: number;
     duplicates: number;
     repeatFailed: number;
     successRate: string;
@@ -144,6 +148,9 @@ export async function getSalesTeamWithStats(): Promise<ActionResult<SalesTeamMem
             planDate: true,
             spkStatus: true,
             keterangan: true,
+            keteranganSpv: true,
+            keteranganAdmin: true,
+            isUnplanned: true,
             isDuplicate: true,
             isRepeatFailed: true,
             createdAt: true,
@@ -159,6 +166,7 @@ export async function getSalesTeamWithStats(): Promise<ActionResult<SalesTeamMem
       const berhasil = u.planSpks.filter((p) => p.spkStatus === "BERHASIL").length;
       const pending = u.planSpks.filter((p) => p.spkStatus === "PENDING").length;
       const belumBerhasil = u.planSpks.filter((p) => p.spkStatus === "BELUM_BERHASIL").length;
+      const unplanned = u.planSpks.filter((p) => p.isUnplanned).length;
       const duplicates = u.planSpks.filter((p) => p.isDuplicate).length;
       const repeatFailed = u.planSpks.filter((p) => p.isRepeatFailed).length;
       const successRate = total > 0 ? ((berhasil / total) * 100).toFixed(1) : "0.0";
@@ -171,7 +179,7 @@ export async function getSalesTeamWithStats(): Promise<ActionResult<SalesTeamMem
         phone: u.phone,
         isActive: u.isActive,
         planSpks: u.planSpks as SalesTeamPlanItem[],
-        stats: { total, berhasil, pending, belumBerhasil, duplicates, repeatFailed, successRate },
+        stats: { total, berhasil, pending, belumBerhasil, unplanned, duplicates, repeatFailed, successRate },
       };
     });
 

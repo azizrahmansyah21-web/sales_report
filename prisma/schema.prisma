@@ -57,9 +57,12 @@ model PlanSPK {
 
   spkStatus         SpkStatus @default(PENDING) @map("spk_status")
   keterangan        String?   @db.Text
+  keteranganSpv     String?   @map("keterangan_spv") @db.Text
+  keteranganAdmin   String?   @map("keterangan_admin") @db.Text
 
   isDuplicate       Boolean   @default(false) @map("is_duplicate")
   isRepeatFailed    Boolean   @default(false) @map("is_repeat_failed")
+  isUnplanned       Boolean   @default(false) @map("is_unplanned")
 
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")

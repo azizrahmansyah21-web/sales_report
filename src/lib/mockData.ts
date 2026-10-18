@@ -68,20 +68,22 @@ export interface TimelineDrawerData {
 }
 
 export const TOYOTA_MODELS = [
-  "Kijang Innova Zenix 2.0 V CVT (Platinum White Pearl)",
-  "Kijang Innova Zenix 2.0 G CVT",
-  "All New Avanza 1.5 G CVT",
-  "All New Veloz 1.5 Q CVT",
-  "Hilux Rangga Cab Flatdeck 2.4 DSL",
-  "Hilux Rangga Cab & Chassis 2.4 DSL",
-  "Hilux Single Cab 4x4 MT",
-  "Hilux Double Cab 2.4 V 4x4 AT",
-  "New Fortuner 2.8 GR Sport 4x4",
-  "New Fortuner 2.8 VRZ 4x2",
-  "Yaris Cross 1.5 S HEV GR",
-  "All New Rush 1.5 S GR Sport",
-  "New Calya 1.2 G MT",
-  "New Agya 1.2 GR Sport",
+  "Agya",
+  "Calya",
+  "Avanza",
+  "Veloz",
+  "Raize",
+  "Rush",
+  "Yaris Cross",
+  "Innova Reborn",
+  "Innova Zenix",
+  "Fortuner",
+  "Hilux Single Cabin",
+  "Hilux Double Cabin",
+  "Corolla Cross",
+  "HiAce",
+  "Voxy",
+  "Alphard",
 ];
 
 export const SALES_ADVISORS: SalesAdvisor[] = [

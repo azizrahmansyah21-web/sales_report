@@ -22,7 +22,6 @@ import {
   Eye,
   X,
   ExternalLink,
-  ShieldCheck,
   Calendar,
 } from "lucide-react";
 
@@ -39,37 +38,105 @@ export default function AdminTeamClient({
   const [filterTab, setFilterTab] = useState<"ALL" | "TOP" | "ATTENTION" | "PENDING">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Filter Periode: Bulan Berjalan (Default) atau Semua Riwayat / Bulan Spesifik
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("CURRENT_MONTH");
+
+  // Ekstrak daftar bulan unik yang ada di seluruh dataset rencana
+  const availableMonths = useMemo(() => {
+    const monthsSet = new Set<string>();
+    for (const m of members) {
+      for (const p of m.planSpks) {
+        const d = new Date(p.planDate);
+        if (!isNaN(d.getTime())) {
+          monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+      }
+    }
+    monthsSet.add(currentMonthStr);
+
+    const monthNames = [
+      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+      "Juli", "Agustus", "September", "Oktober", "November", "Desember",
+    ];
+
+    return Array.from(monthsSet)
+      .sort((a, b) => b.localeCompare(a))
+      .map((ym) => {
+        const [yearStr, monthStr] = ym.split("-");
+        const monthIndex = parseInt(monthStr, 10) - 1;
+        const monthName = monthNames[monthIndex] || monthStr;
+        return { value: ym, label: `${monthName} ${yearStr}` };
+      });
+  }, [members, currentMonthStr]);
+
   // Modal inspection state for a specific sales member's plans
   const [selectedMember, setSelectedMember] = useState<SalesTeamMember | null>(null);
 
-  // Summary Metrics calculations
-  const totalSales = members.length;
+  // Filter rencana berdasarkan periode terpilih dan hitung ulang metrik tiap anggota sales
+  const periodMembers = useMemo(() => {
+    return members.map((m) => {
+      const filteredPlans = m.planSpks.filter((p) => {
+        if (selectedPeriod === "ALL_TIME") return true;
+        const pDate = new Date(p.planDate);
+        const pMonth = `${pDate.getFullYear()}-${String(pDate.getMonth() + 1).padStart(2, "0")}`;
+        if (selectedPeriod === "CURRENT_MONTH") {
+          return pMonth === currentMonthStr;
+        }
+        return pMonth === selectedPeriod;
+      });
+
+      const total = filteredPlans.length;
+      const berhasil = filteredPlans.filter((p) => p.spkStatus === "BERHASIL").length;
+      const pending = filteredPlans.filter((p) => p.spkStatus === "PENDING").length;
+      const belumBerhasil = filteredPlans.filter((p) => p.spkStatus === "BELUM_BERHASIL").length;
+      const unplanned = filteredPlans.filter((p) => p.isUnplanned).length;
+      const duplicates = filteredPlans.filter((p) => p.isDuplicate).length;
+      const repeatFailed = filteredPlans.filter((p) => p.isRepeatFailed).length;
+      const successRate = total > 0 ? ((berhasil / total) * 100).toFixed(1) : "0.0";
+
+      return {
+        ...m,
+        planSpks: filteredPlans,
+        stats: {
+          total,
+          berhasil,
+          pending,
+          belumBerhasil,
+          unplanned,
+          duplicates,
+          repeatFailed,
+          successRate,
+        },
+      };
+    });
+  }, [members, selectedPeriod, currentMonthStr]);
+
+  // Summary Metrics calculations dari periodMembers
+  const totalSales = periodMembers.length;
   const totalPlans = useMemo(
-    () => members.reduce((acc, m) => acc + m.stats.total, 0),
-    [members]
+    () => periodMembers.reduce((acc, m) => acc + m.stats.total, 0),
+    [periodMembers]
   );
   const totalBerhasil = useMemo(
-    () => members.reduce((acc, m) => acc + m.stats.berhasil, 0),
-    [members]
+    () => periodMembers.reduce((acc, m) => acc + m.stats.berhasil, 0),
+    [periodMembers]
   );
-  const totalBelumBerhasil = useMemo(
-    () => members.reduce((acc, m) => acc + m.stats.belumBerhasil, 0),
-    [members]
-  );
-  const totalPending = useMemo(
-    () => members.reduce((acc, m) => acc + m.stats.pending, 0),
-    [members]
+  const totalUnplanned = useMemo(
+    () => periodMembers.reduce((acc, m) => acc + m.stats.unplanned, 0),
+    [periodMembers]
   );
   const totalDuplicates = useMemo(
-    () => members.reduce((acc, m) => acc + m.stats.duplicates, 0),
-    [members]
+    () => periodMembers.reduce((acc, m) => acc + m.stats.duplicates, 0),
+    [periodMembers]
   );
   const branchConversionRate =
     totalPlans > 0 ? ((totalBerhasil / totalPlans) * 100).toFixed(1) : "0.0";
 
   // Filtered members list
   const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
+    const list = periodMembers.filter((m) => {
       const matchSearch =
         m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (m.nip && m.nip.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -81,7 +148,12 @@ export default function AdminTeamClient({
         return m.stats.berhasil > 0;
       }
       if (filterTab === "ATTENTION") {
-        return m.stats.belumBerhasil > 0 || m.stats.duplicates > 0 || m.stats.repeatFailed > 0;
+        return (
+          m.stats.belumBerhasil > 0 ||
+          m.stats.duplicates > 0 ||
+          m.stats.repeatFailed > 0 ||
+          m.stats.unplanned > 0
+        );
       }
       if (filterTab === "PENDING") {
         return m.stats.pending > 0;
@@ -89,7 +161,9 @@ export default function AdminTeamClient({
 
       return true;
     });
-  }, [members, searchQuery, filterTab]);
+
+    return [...list].sort((a, b) => b.stats.berhasil - a.stats.berhasil);
+  }, [periodMembers, searchQuery, filterTab]);
 
   // Export Sales Performance to CSV (Compatible with Excel)
   const handleExportCsv = () => {
@@ -103,6 +177,7 @@ export default function AdminTeamClient({
       "SPK Berhasil (Closing Sah)",
       "Menunggu Hari H (Pending)",
       "Belum Berhasil",
+      "SPK Unplanned",
       "Kasus Duplikat",
       "Gagal Berulang",
       "Rasio Konversi (%)",
@@ -123,6 +198,7 @@ export default function AdminTeamClient({
         m.stats.berhasil,
         m.stats.pending,
         m.stats.belumBerhasil,
+        m.stats.unplanned,
         m.stats.duplicates,
         m.stats.repeatFailed,
         `"${m.stats.successRate}%"`,
@@ -171,11 +247,32 @@ export default function AdminTeamClient({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+            {/* Pemilih Periode Evaluasi */}
+            <div className="flex items-center gap-1.5 min-h-[40px] px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <select
+                value={selectedPeriod}
+                onChange={(e) => setSelectedPeriod(e.target.value)}
+                className="bg-transparent outline-none cursor-pointer"
+                title="Pilih rentang periode evaluasi performa"
+              >
+                <option value="CURRENT_MONTH">Bulan Berjalan</option>
+                <option value="ALL_TIME">Semua Riwayat (All Time)</option>
+                {availableMonths
+                  .filter((m) => m.value !== currentMonthStr)
+                  .map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
             <button
               type="button"
               onClick={handleExportCsv}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 transition-colors shadow-2xs cursor-pointer"
+              className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 transition-colors shadow-2xs cursor-pointer"
               title="Unduh laporan performa sales dalam format file CSV / Excel"
             >
               <Download className="w-4 h-4" />
@@ -184,62 +281,73 @@ export default function AdminTeamClient({
           </div>
         </div>
 
-        {/* 5 KPI Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+        {/* 6 KPI Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
               <span>Total Sales</span>
               <Users className="w-4 h-4 text-blue-600" />
             </div>
-            <p className="text-2xl font-black text-slate-900 tracking-tight">
+            <p className="text-xl font-black text-slate-900 tracking-tight">
               {totalSales} <span className="text-xs font-semibold text-slate-500">Sales</span>
             </p>
-            <p className="text-[10px] text-slate-400">Terdaftar aktif di sistem</p>
+            <p className="text-[10px] text-slate-400">Terdaftar aktif</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-500 font-semibold">
               <span>Rencana SPK</span>
               <FileSpreadsheet className="w-4 h-4 text-slate-600" />
             </div>
-            <p className="text-2xl font-black text-slate-900 tracking-tight">
+            <p className="text-xl font-black text-slate-900 tracking-tight">
               {totalPlans} <span className="text-xs font-semibold text-slate-500">Unit</span>
             </p>
             <p className="text-[10px] text-slate-400">Target input sales</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-emerald-800 font-semibold">
               <span>Closing Sah</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
-            <p className="text-2xl font-black text-emerald-700 tracking-tight">
+            <p className="text-xl font-black text-emerald-700 tracking-tight">
               {totalBerhasil} <span className="text-xs font-semibold text-emerald-600">SPK</span>
             </p>
-            <p className="text-[10px] text-emerald-600 font-medium">Realisasi diverifikasi</p>
+            <p className="text-[10px] text-emerald-600 font-medium">Realisasi closing</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
+            <div className="flex items-center justify-between text-xs text-purple-800 font-semibold">
+              <span>SPK Unplanned</span>
+              <Award className="w-4 h-4 text-purple-600" />
+            </div>
+            <p className="text-xl font-black text-purple-700 tracking-tight">
+              {totalUnplanned} <span className="text-xs font-semibold text-purple-600">SPK</span>
+            </p>
+            <p className="text-[10px] text-purple-600 font-medium">Closing dadakan</p>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-blue-800 font-semibold">
               <span>Rasio Konversi</span>
               <TrendingUp className="w-4 h-4 text-blue-600" />
             </div>
-            <p className="text-2xl font-black text-blue-700 tracking-tight">
+            <p className="text-xl font-black text-blue-700 tracking-tight">
               {branchConversionRate}%
             </p>
-            <p className="text-[10px] text-slate-400">Rata-rata cabang 247</p>
+            <p className="text-[10px] text-slate-400">Efektivitas closing</p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 shadow-2xs space-y-1 col-span-2 sm:col-span-1">
+          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 shadow-2xs space-y-1">
             <div className="flex items-center justify-between text-xs text-amber-900 font-bold">
-              <span>Catatan Sengketa</span>
+              <span>Duplikat</span>
               <AlertTriangle className="w-4 h-4 text-amber-700" />
             </div>
-            <p className="text-2xl font-black text-amber-950 tracking-tight">
+            <p className="text-xl font-black text-amber-950 tracking-tight">
               {totalDuplicates}{" "}
               <span className="text-xs font-semibold text-amber-800">Kasus</span>
             </p>
-            <p className="text-[10px] text-amber-800 font-medium">Potensi nama ganda</p>
+            <p className="text-[10px] text-amber-800 font-medium">Nama sama</p>
           </div>
         </div>
 
@@ -322,6 +430,7 @@ export default function AdminTeamClient({
                   <th className="py-3.5 px-4 text-center">Closing Sah</th>
                   <th className="py-3.5 px-4 text-center">Menunggu</th>
                   <th className="py-3.5 px-4 text-center">Belum Berhasil</th>
+                  <th className="py-3.5 px-4 text-center">Unplanned</th>
                   <th className="py-3.5 px-4">Konversi</th>
                   <th className="py-3.5 px-4 text-center">Catatan</th>
                   <th className="py-3.5 px-4 text-center w-28">Aksi</th>
@@ -433,6 +542,17 @@ export default function AdminTeamClient({
                           )}
                         </td>
 
+                        {/* SPK Unplanned */}
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          {member.stats.unplanned > 0 ? (
+                            <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full font-bold text-xs bg-purple-100 text-purple-900 border border-purple-300">
+                              {member.stats.unplanned}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 font-mono">0</span>
+                          )}
+                        </td>
+
                         {/* Conversion Rate */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <div className="w-28 space-y-1">
@@ -515,7 +635,7 @@ export default function AdminTeamClient({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={10} className="text-center py-12 text-slate-400 space-y-2">
+                    <td colSpan={11} className="text-center py-12 text-slate-400 space-y-2">
                       <Users className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="font-semibold text-xs text-slate-600">
                         Tidak ada personel sales yang cocok dengan filter.
@@ -605,8 +725,8 @@ export default function AdminTeamClient({
               </button>
             </div>
 
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-4 gap-2 text-center">
+            {/* Quick Stats Grid 5 Kolom */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="text-[10px] text-slate-500 font-semibold block uppercase">
                   Total Target
@@ -631,6 +751,15 @@ export default function AdminTeamClient({
                 </span>
                 <span className="text-lg font-black text-amber-800">
                   {selectedMember.stats.pending}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-purple-50 border border-purple-200">
+                <span className="text-[10px] text-purple-800 font-semibold block uppercase">
+                  Unplanned
+                </span>
+                <span className="text-lg font-black text-purple-700">
+                  {selectedMember.stats.unplanned}
                 </span>
               </div>
 
@@ -682,6 +811,11 @@ export default function AdminTeamClient({
                             <span className="font-bold text-slate-900">
                               {plan.customerName}
                             </span>
+                            {plan.isUnplanned && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-900 border border-purple-300">
+                                Unplanned
+                              </span>
+                            )}
                             {plan.isDuplicate && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
                                 Duplikat
@@ -698,7 +832,17 @@ export default function AdminTeamClient({
                               <span>Target: {planDateStr}</span>
                             </span>
                           </div>
-                          {plan.keterangan && (
+                          {plan.keteranganSpv && (
+                            <p className="text-[10px] text-purple-950 font-medium bg-purple-50/80 p-1.5 rounded border border-purple-200 mt-1">
+                              Catatan SPV: &quot;{plan.keteranganSpv}&quot;
+                            </p>
+                          )}
+                          {plan.keteranganAdmin && (
+                            <p className="text-[10px] text-blue-950 font-medium bg-blue-50/80 p-1.5 rounded border border-blue-200 mt-1">
+                              Catatan Admin: &quot;{plan.keteranganAdmin}&quot;
+                            </p>
+                          )}
+                          {!plan.keteranganSpv && !plan.keteranganAdmin && plan.keterangan && (
                             <p className="text-[10px] text-slate-600 italic bg-white p-1.5 rounded border border-slate-200 mt-1">
                               Catatan Evaluasi: &quot;{plan.keterangan}&quot;
                             </p>

@@ -31,5 +31,50 @@ export const updateKeteranganSchema = z.object({
     .transform((val) => (val === "" ? null : val)),
 });
 
+export const updateKeteranganSpvSchema = z.object({
+  keteranganSpv: z
+    .string()
+    .max(1000, "Catatan SPV maksimal 1000 karakter")
+    .nullable()
+    .transform((val) => (val === "" ? null : val)),
+});
+
+export const updateSpkStatusDanAdminSchema = z.object({
+  spkStatus: z.enum(["PENDING", "BERHASIL", "BELUM_BERHASIL"]),
+  keteranganAdmin: z
+    .string()
+    .max(1000, "Catatan Admin maksimal 1000 karakter")
+    .nullable()
+    .transform((val) => (val === "" ? null : val)),
+  isUnplanned: z.boolean().default(false),
+});
+
+export const createUnplannedSpkSchema = z.object({
+  salesId: z.string().uuid("ID Sales wajib dipilih"),
+  customerName: z
+    .string()
+    .min(2, "Nama customer minimal 2 karakter")
+    .max(100, "Nama customer maksimal 100 karakter")
+    .trim(),
+  unitName: z
+    .string()
+    .min(2, "Unit Toyota wajib dipilih")
+    .max(100, "Nama unit maksimal 100 karakter")
+    .trim(),
+  planDate: z
+    .string()
+    .date("Format tanggal tidak valid")
+    .transform((val) => new Date(val)),
+  spkStatus: z
+    .enum(["BERHASIL", "PENDING", "BELUM_BERHASIL"])
+    .default("BERHASIL"),
+  keteranganAdmin: z.string().max(1000).nullable().optional(),
+});
+
 export type UpdateSpkStatusInput = z.infer<typeof updateSpkStatusSchema>;
 export type UpdateKeteranganInput = z.infer<typeof updateKeteranganSchema>;
+export type UpdateKeteranganSpvInput = z.infer<typeof updateKeteranganSpvSchema>;
+export type UpdateSpkStatusDanAdminInput = z.infer<
+  typeof updateSpkStatusDanAdminSchema
+>;
+export type CreateUnplannedSpkInput = z.infer<typeof createUnplannedSpkSchema>;

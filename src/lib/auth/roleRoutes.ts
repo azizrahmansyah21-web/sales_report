@@ -56,6 +56,19 @@ export function canManageRealization(role?: string | null): boolean {
 }
 
 /**
+ * Memeriksa apakah pengguna memiliki hak otorisasi untuk mengubah status closing SPK.
+ * Khusus dibatasi hanya untuk ADMIN dan ADH. SPV dilarang mengubah status demi kepatuhan audit.
+ *
+ * @param role - String peran pengguna
+ * @returns true jika peran ADMIN atau ADH
+ */
+export function canChangeSpkStatus(role?: string | null): boolean {
+  if (!role) return false;
+  const normalized = role.toUpperCase();
+  return normalized === "ADMIN" || normalized === "ADH";
+}
+
+/**
  * Memeriksa apakah pengguna berhak mengakses area administrasi cabang (/admin/*).
  *
  * @param role - String peran pengguna

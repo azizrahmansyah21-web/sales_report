@@ -22,7 +22,10 @@ export interface TimelineDrawerPlanItem {
   unitName: string;
   planDate: string | Date;
   spkStatus: SpkStatus;
-  keterangan: string | null;
+  keterangan?: string | null;
+  keteranganSpv?: string | null;
+  keteranganAdmin?: string | null;
+  isUnplanned?: boolean;
   isDuplicate: boolean;
   isRepeatFailed: boolean;
   createdAt: string | Date;
@@ -198,6 +201,11 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
                             <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm mt-0.5">
                               <Car className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                               <span>{item.unitName}</span>
+                              {item.isUnplanned && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                  Unplanned
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -220,24 +228,57 @@ export const TimelineJourneyDrawer: React.FC<TimelineJourneyDrawerProps> = ({
                           )}
                         </div>
 
-                        {/* Admin Evaluation Notes */}
-                        {item.keterangan ? (
-                          <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs text-slate-700 flex items-start gap-2">
-                            <FileText className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
-                            <div>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                                Catatan Evaluasi:
-                              </span>
-                              <p className="text-[11px] text-slate-700 leading-relaxed italic">
-                                &quot;{item.keterangan}&quot;
-                              </p>
+                        {/* Catatan SPV & Catatan Admin */}
+                        <div className="space-y-1.5">
+                          {item.keteranganSpv && (
+                            <div className="rounded-xl bg-purple-50/70 border border-purple-200 p-2 text-xs text-purple-900 flex items-start gap-2">
+                              <FileText className="w-3.5 h-3.5 text-purple-600 mt-0.5 shrink-0" />
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
+                                  Catatan SPV:
+                                </span>
+                                <p className="text-[11px] leading-relaxed">
+                                  &quot;{item.keteranganSpv}&quot;
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-slate-400 italic">
-                            Belum ada catatan evaluasi untuk entri ini.
-                          </p>
-                        )}
+                          )}
+
+                          {item.keteranganAdmin && (
+                            <div className="rounded-xl bg-blue-50/70 border border-blue-200 p-2 text-xs text-blue-900 flex items-start gap-2">
+                              <FileText className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
+                                  Catatan Admin:
+                                </span>
+                                <p className="text-[11px] leading-relaxed">
+                                  &quot;{item.keteranganAdmin}&quot;
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Fallback untuk legacy data yang hanya memiliki keterangan lama */}
+                          {!item.keteranganSpv && !item.keteranganAdmin && item.keterangan && (
+                            <div className="rounded-xl bg-slate-50 border border-slate-200 p-2 text-xs text-slate-700 flex items-start gap-2">
+                              <FileText className="w-3.5 h-3.5 text-slate-400 mt-0.5 shrink-0" />
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  Catatan Evaluasi:
+                                </span>
+                                <p className="text-[11px] text-slate-700 leading-relaxed italic">
+                                  &quot;{item.keterangan}&quot;
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {!item.keteranganSpv && !item.keteranganAdmin && !item.keterangan && (
+                            <p className="text-[10px] text-slate-400 italic">
+                              Belum ada catatan evaluasi untuk entri ini.
+                            </p>
+                          )}
+                        </div>
 
                         {/* Footer Info: Sales & Created Time */}
                         <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">

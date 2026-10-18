@@ -17,14 +17,19 @@ import { auth } from "@/lib/auth";
 import {
   planSpkSchema,
   updateSpkStatusSchema,
-  updateKeteranganSchema,
+  updateKeteranganSpvSchema,
+  updateSpkStatusDanAdminSchema,
+  createUnplannedSpkSchema,
 } from "@/lib/validations/planSpk";
 import {
   isPastCutoff16WIB,
   getDateStringWIB,
   getTodayRangeWIB,
 } from "@/lib/utils/wibDate";
-import { canManageRealization } from "@/lib/auth/roleRoutes";
+import {
+  canManageRealization,
+  canChangeSpkStatus,
+} from "@/lib/auth/roleRoutes";
 import { sendPlanSpkNotification } from "@/lib/whatsapp/client";
 import { SpkStatus } from "@prisma/client";
 import type { PlanSPK, User, Prisma } from "@prisma/client";
@@ -279,6 +284,10 @@ export async function getPlanSpks(params?: {
  * @param overrideSession - Opsional token sesi untuk testing
  * @returns Data rencana SPK terupdate
  */
+/**
+ * Memperbarui status realisasi SPK (PENDING, BERHASIL, atau BELUM_BERHASIL).
+ * Wewenang dibatasi khusus untuk ADMIN dan ADH (SPV dilarang mengubah status).
+ */
 export async function updateSpkStatus(
   planId: string,
   formData: unknown,
@@ -286,10 +295,10 @@ export async function updateSpkStatus(
 ): Promise<ActionResult<PlanSPK>> {
   try {
     const session = overrideSession !== undefined ? overrideSession : await auth();
-    if (!session?.user || !canManageRealization(session.user.role)) {
+    if (!session?.user || !canChangeSpkStatus(session.user.role)) {
       return {
         success: false,
-        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang dapat memverifikasi status SPK.",
+        error: "Akses ditolak: Hanya Admin dan ADH yang dapat memverifikasi status SPK.",
       };
     }
 
@@ -305,6 +314,7 @@ export async function updateSpkStatus(
 
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/admin/team");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateSpkStatus] Error:", error);
@@ -313,15 +323,10 @@ export async function updateSpkStatus(
 }
 
 /**
- * Memperbarui catatan evaluasi operasional rencana SPK.
- * Wewenang diberikan kepada ADMIN, ADH, dan SPV untuk menindaklanjuti kendala sales.
- *
- * @param planId - ID rencana SPK
- * @param formData - Objek berisi catatan evaluasi
- * @param overrideSession - Opsional token sesi untuk testing
- * @returns Data rencana SPK terupdate
+ * Memperbarui catatan supervisi oleh SPV.
+ * Diizinkan bagi akun dengan role SPV, ADMIN, dan ADH.
  */
-export async function updateKeterangan(
+export async function updateKeteranganSpv(
   planId: string,
   formData: unknown,
   overrideSession?: { user: ActionSessionUser } | null
@@ -331,36 +336,129 @@ export async function updateKeterangan(
     if (!session?.user || !canManageRealization(session.user.role)) {
       return {
         success: false,
-        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang berwenang mengisi catatan evaluasi.",
+        error: "Akses ditolak: Hanya SPV, Admin, dan ADH yang dapat mengisi Catatan SPV.",
       };
     }
 
-    const parsed = updateKeteranganSchema.safeParse(formData);
+    const parsed = updateKeteranganSpvSchema.safeParse(formData);
     if (!parsed.success) {
-      return { success: false, error: "Format catatan evaluasi tidak valid." };
+      return { success: false, error: "Format catatan SPV tidak valid." };
     }
 
     const updated = await prisma.planSPK.update({
       where: { id: planId },
-      data: { keterangan: parsed.data.keterangan },
+      data: { keteranganSpv: parsed.data.keteranganSpv },
     });
 
-    safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/admin/team");
     return { success: true, data: updated };
   } catch (error) {
-    console.error("[updateKeterangan] Error:", error);
-    return { success: false, error: "Gagal menyimpan catatan evaluasi operasional." };
+    console.error("[updateKeteranganSpv] Error:", error);
+    return { success: false, error: "Gagal menyimpan Catatan SPV." };
   }
 }
 
 /**
- * Memperbarui status realisasi dan catatan evaluasi secara serentak dalam satu transaksi.
- * Memudahkan supervisor SPV dan manajemen menginput hasil evaluasi langsung dari modal.
- *
- * @param planId - ID rencana SPK
- * @param payload - Status dan catatan baru
- * @returns Data rencana SPK terupdate
+ * Memperbarui status realisasi SPK, catatan verifikasi admin, dan status SPK unplanned.
+ * Hak akses dibatasi ketat khusus untuk ADMIN dan ADH (SPV dilarang mengubah status).
+ */
+export async function updateSpkStatusDanAdmin(
+  planId: string,
+  formData: unknown,
+  overrideSession?: { user: ActionSessionUser } | null
+): Promise<ActionResult<PlanSPK>> {
+  try {
+    const session = overrideSession !== undefined ? overrideSession : await auth();
+    if (!session?.user || !canChangeSpkStatus(session.user.role)) {
+      return {
+        success: false,
+        error: "Akses ditolak: Hanya Admin dan ADH yang berwenang mengubah status SPK dan catatan admin.",
+      };
+    }
+
+    const parsed = updateSpkStatusDanAdminSchema.safeParse(formData);
+    if (!parsed.success) {
+      return { success: false, error: "Data status atau catatan admin tidak valid." };
+    }
+
+    const updated = await prisma.planSPK.update({
+      where: { id: planId },
+      data: {
+        spkStatus: parsed.data.spkStatus,
+        keteranganAdmin: parsed.data.keteranganAdmin,
+        isUnplanned: parsed.data.isUnplanned,
+      },
+    });
+
+    safeRevalidatePath("/input");
+    safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/admin/team");
+    return { success: true, data: updated };
+  } catch (error) {
+    console.error("[updateSpkStatusDanAdmin] Error:", error);
+    return { success: false, error: "Gagal memperbarui status realisasi dan catatan admin." };
+  }
+}
+
+/**
+ * Mendaftarkan SPK closing dadakan (unplanned) langsung oleh Admin/ADH.
+ * Digunakan jika sales tembus closing fisik tanpa sempat menginput rencana H-1.
+ */
+export async function createUnplannedSpk(
+  formData: unknown,
+  overrideSession?: { user: ActionSessionUser } | null
+): Promise<ActionResult<PlanSPK>> {
+  try {
+    const session = overrideSession !== undefined ? overrideSession : await auth();
+    if (!session?.user || !canChangeSpkStatus(session.user.role)) {
+      return {
+        success: false,
+        error: "Akses ditolak: Hanya Admin dan ADH yang berwenang mendaftarkan SPK Unplanned.",
+      };
+    }
+
+    const parsed = createUnplannedSpkSchema.safeParse(formData);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? "Data tidak valid";
+      return { success: false, error: firstError };
+    }
+
+    const { salesId, customerName, unitName, planDate, spkStatus, keteranganAdmin } = parsed.data;
+
+    const salesUser = await prisma.user.findUnique({
+      where: { id: salesId },
+      select: { id: true },
+    });
+
+    if (!salesUser) {
+      return { success: false, error: "Akun sales yang dipilih tidak terdaftar di sistem." };
+    }
+
+    const created = await prisma.planSPK.create({
+      data: {
+        salesId,
+        customerName: customerName.trim(),
+        unitName: unitName.trim(),
+        planDate,
+        spkStatus,
+        keteranganAdmin: keteranganAdmin ? keteranganAdmin.trim() : null,
+        isUnplanned: true,
+      },
+    });
+
+    safeRevalidatePath("/input");
+    safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/admin/team");
+    return { success: true, data: created };
+  } catch (error) {
+    console.error("[createUnplannedSpk] Error:", error);
+    return { success: false, error: "Gagal mendaftarkan SPK Unplanned." };
+  }
+}
+
+/**
+ * Memperbarui status realisasi dan catatan evaluasi lama (kompatibilitas transisi).
  */
 export async function updateSpkRealization(
   planId: string,
@@ -368,10 +466,10 @@ export async function updateSpkRealization(
 ): Promise<ActionResult<PlanSPK>> {
   try {
     const session = await auth();
-    if (!session?.user || !canManageRealization(session.user.role)) {
+    if (!session?.user || !canChangeSpkStatus(session.user.role)) {
       return {
         success: false,
-        error: "Akses ditolak: Hanya Admin, ADH, dan SPV yang berwenang memperbarui realisasi.",
+        error: "Akses ditolak: Hanya Admin dan ADH yang berwenang memperbarui status realisasi.",
       };
     }
 
@@ -385,6 +483,7 @@ export async function updateSpkRealization(
 
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
+    safeRevalidatePath("/admin/team");
     return { success: true, data: updated };
   } catch (error) {
     console.error("[updateSpkRealization] Error:", error);
