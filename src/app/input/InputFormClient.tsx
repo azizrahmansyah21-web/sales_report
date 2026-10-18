@@ -9,7 +9,13 @@
 
 "use client";
 
-import React, { useState, useTransition, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useSyncExternalStore,
+  useTransition,
+  useCallback,
+} from "react";
 import MobilePwaLayout from "@/components/templates/MobilePwaLayout";
 import FormField from "@/components/molecules/FormField";
 import Input from "@/components/atoms/Input";
@@ -23,13 +29,20 @@ import type { PlanSPK } from "@prisma/client";
 import type { SmartDateOptionsWIB } from "@/lib/utils/wibDate";
 import { formatDisplayDateWIB } from "@/lib/utils/wibDate";
 import {
+  saveOfflinePlan,
+  getPendingCount,
+  syncOfflinePlans,
+} from "@/lib/pwa/offlineQueue";
+import { cn } from "@/lib/utils";
+import {
   User,
   Car,
-  Calendar,
   Send,
   AlertTriangle,
   CheckCircle2,
   Clock,
+  WifiOff,
+  RefreshCw,
 } from "lucide-react";
 
 // ─── KOMPONEN PILIHAN TANGGAL PINTAR (SMART DATE) ───────────────────────────
@@ -162,11 +175,30 @@ function DealHistorySection({ deals }: DealHistoryProps) {
   );
 }
 
+// ─── SUBSCRIBER KONEKSI JARINGAN (REACT 18/19 HYDRATION SAFE) ───────────────
+
+function subscribeNetwork(callback: () => void) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+
+function getNetworkSnapshot() {
+  return navigator.onLine;
+}
+
+function getServerNetworkSnapshot() {
+  return true;
+}
+
 // ─── MAIN CLIENT FORM COMPONENT ─────────────────────────────────────────────
 
 export interface InputFormClientProps {
-  /** ID pengguna sales yang sedang login */
-  userId: string;
+  /** ID pengguna sales yang sedang login (opsional) */
+  userId?: string;
   /** Nama lengkap sales untuk salam antarmuka */
   salesName: string;
   /** Daftar riwayat SPK berstatus DEAL milik sales */
@@ -176,7 +208,6 @@ export interface InputFormClientProps {
 }
 
 export default function InputFormClient({
-  userId,
   salesName,
   dealHistory,
   initialSmartDate,
@@ -189,9 +220,58 @@ export default function InputFormClient({
   const [submittedPlan, setSubmittedPlan] = useState<PlanSPK | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // ─── STATE PWA OFFLINE QUEUE (INDEXEDDB) ───────────────────────────────────
+  const isOnline = useSyncExternalStore(
+    subscribeNetwork,
+    getNetworkSnapshot,
+    getServerNetworkSnapshot
+  );
+  const [offlineCount, setOfflineCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [offlineSavedNotice, setOfflineSavedNotice] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<{
+    synced: number;
+    failed: number;
+  } | null>(null);
+
+  const triggerAutoSync = useCallback(async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    const count = await getPendingCount();
+    if (count === 0) return;
+
+    setIsSyncing(true);
+    try {
+      const { syncedCount, failedCount } = await syncOfflinePlans();
+      const remaining = await getPendingCount();
+      setOfflineCount(remaining);
+
+      if (syncedCount > 0 || failedCount > 0) {
+        setSyncNotice({ synced: syncedCount, failed: failedCount });
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      getPendingCount().then((count) => setOfflineCount(count));
+    });
+
+    const handleOnline = () => {
+      triggerAutoSync();
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [triggerAutoSync]);
+
   const handleResetForNextInput = useCallback(() => {
     setSubmittedPlan(null);
     setErrorMessage(null);
+    setOfflineSavedNotice(false);
     setCustomerName("");
     setUnitName("");
     setPlanDate(initialSmartDate.defaultPlanDate);
@@ -200,6 +280,8 @@ export default function InputFormClient({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setOfflineSavedNotice(false);
+    setSyncNotice(null);
 
     if (!customerName.trim()) {
       setErrorMessage("Nama pelanggan wajib diisi.");
@@ -212,20 +294,60 @@ export default function InputFormClient({
     }
 
     startTransition(async () => {
-      const result = await createPlanSpk(userId, {
-        customerName: customerName.trim(),
-        unitName: unitName.trim(),
-        planDate,
-      });
-
-      if (!result.success) {
-        setErrorMessage(result.error);
+      // 1. Tangani jika koneksi browser terdeteksi offline
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        try {
+          await saveOfflinePlan({
+            customerName: customerName.trim(),
+            unitName: unitName.trim(),
+            planDate,
+          });
+          const count = await getPendingCount();
+          setOfflineCount(count);
+          setOfflineSavedNotice(true);
+          setCustomerName("");
+          setUnitName("");
+        } catch {
+          setErrorMessage("Gagal menyimpan ke memori lokal perangkat.");
+        }
         return;
       }
 
-      setSubmittedPlan(result.data);
-      setCustomerName("");
-      setUnitName("");
+      // 2. Jika online, coba kirim ke server Action dengan fallback ke antrean offline
+      try {
+        const result = await createPlanSpk({
+          customerName: customerName.trim(),
+          unitName: unitName.trim(),
+          planDate,
+        });
+
+        if (!result.success) {
+          setErrorMessage(result.error);
+          return;
+        }
+
+        setSubmittedPlan(result.data);
+        setCustomerName("");
+        setUnitName("");
+      } catch {
+        // Terjadi kegagalan jaringan saat pengiriman berlangsung (blank spot mendadak)
+        try {
+          await saveOfflinePlan({
+            customerName: customerName.trim(),
+            unitName: unitName.trim(),
+            planDate,
+          });
+          const count = await getPendingCount();
+          setOfflineCount(count);
+          setOfflineSavedNotice(true);
+          setCustomerName("");
+          setUnitName("");
+        } catch {
+          setErrorMessage(
+            "Koneksi jaringan terputus dan gagal menyimpan antrean lokal."
+          );
+        }
+      }
     });
   };
 
@@ -241,6 +363,64 @@ export default function InputFormClient({
             Daftarkan rencana prospek SPK esok hari untuk evaluasi target operasional cabang.
           </p>
         </div>
+
+        {/* Indikator Status Offline Perangkat */}
+        {!isOnline && (
+          <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-xs animate-in fade-in duration-200">
+            <WifiOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Koneksi internet terputus. Formulir dialihkan ke antrean offline HP.</span>
+          </div>
+        )}
+
+        {/* Banner Antrean Offline di HP */}
+        {offlineCount > 0 && (
+          <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold leading-tight">
+                  {offlineCount} Rencana Menunggu Sinkronisasi
+                </p>
+                <p className="text-[11px] text-amber-800/90 leading-tight mt-0.5 truncate">
+                  Tersimpan di memori HP dan siap dikirim ke server.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={triggerAutoSync}
+              disabled={isSyncing || !isOnline}
+              className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold shrink-0 transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+            >
+              <RefreshCw className={cn("w-3.5 h-3.5", isSyncing && "animate-spin")} />
+              <span>{isSyncing ? "Mengirim..." : "Kirim"}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Notifikasi Penyimpanan Offline Berhasil */}
+        {offlineSavedNotice && (
+          <ToastAlert
+            type="warning"
+            title="Tersimpan di Antrean Offline HP"
+            message="Rencana SPK telah aman tersimpan di perangkat. Sistem akan mengirimkannya ke server secara otomatis saat sinyal kembali."
+            onDismiss={() => setOfflineSavedNotice(false)}
+          />
+        )}
+
+        {/* Notifikasi Hasil Sinkronisasi */}
+        {syncNotice && (
+          <ToastAlert
+            type={syncNotice.failed === 0 ? "success" : "info"}
+            title="Hasil Sinkronisasi Data"
+            message={`${syncNotice.synced} rencana SPK berhasil dikirim ke server.${
+              syncNotice.failed > 0
+                ? ` (${syncNotice.failed} item tertunda karena validasi atau sinyal)`
+                : ""
+            }`}
+            onDismiss={() => setSyncNotice(null)}
+          />
+        )}
 
         {/* Notifikasi Sukses Pendaftaran */}
         {submittedPlan && (
