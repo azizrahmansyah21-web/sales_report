@@ -78,20 +78,33 @@ export interface ActionSessionUser {
 /**
  * Menyimpan data rencana SPK H-1 baru yang diinput oleh Sales.
  * Menerapkan aturan operasional Cabang 220:
+ * - Mengambil User ID langsung dari sesi terotentikasi server (Security IDOR Patch).
  * - Jika waktu submit sudah >= 16:00 WIB dan tanggal yang dikirim adalah hari ini,
  *   tanggal rencana otomatis dialihkan ke H+1 (esok hari).
  * - Mendeteksi apakah nama pelanggan sudah pernah diajukan sebelumnya (duplikat).
  * - Menandai status gagal berulang jika prospek sebelumnya berstatus BELUM_BERHASIL.
  *
- * @param userId - ID pengguna sales yang sedang login
  * @param formData - Objek input dari form klien
+ * @param overrideSession - Opsional token sesi untuk testing
  * @returns Rencana SPK yang berhasil dibuat
  */
 export async function createPlanSpk(
-  userId: string,
-  formData: unknown
+  formData: unknown,
+  overrideSession?: { user: ActionSessionUser } | null
 ): Promise<ActionResult<PlanSPK>> {
   try {
+    const session =
+      overrideSession !== undefined ? overrideSession : await auth();
+
+    if (!session?.user?.id) {
+      return {
+        success: false,
+        error: "Akses ditolak: Sesi login tidak ditemukan atau telah kedaluwarsa.",
+      };
+    }
+
+    const userId = session.user.id;
+
     const parsed = planSpkSchema.safeParse(formData);
     if (!parsed.success) {
       const firstError = parsed.error.issues[0]?.message ?? "Data tidak valid";
