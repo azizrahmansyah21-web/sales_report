@@ -54,3 +54,9 @@ prisma/seed.ts
 # whatsapp baileys auth session & daemon cache
 auth_info_baileys/
 .cache_*.json
+
+# secrets & infrastructure vault
+*vault*
+*VAULT*
+SECRETS_*
+*.secret*
