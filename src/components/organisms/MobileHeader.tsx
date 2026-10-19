@@ -2,11 +2,9 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import Badge from "@/components/atoms/Badge";
 import Avatar from "@/components/atoms/Avatar";
-import { PlusCircle, User } from "lucide-react";
 
 export interface MobileHeaderProps {
   salesName?: string;
@@ -17,20 +15,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   salesName = "Sales",
   isOnline = true,
 }) => {
-  const pathname = usePathname();
-
-  const navItems = [
-    {
-      href: "/input",
-      label: "Input SPK H-1",
-      icon: <PlusCircle className="w-4 h-4" />,
-    },
-    {
-      href: "/profil",
-      label: "Profil Saya",
-      icon: <User className="w-4 h-4" />,
-    },
-  ];
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs">
@@ -60,31 +44,6 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
             </p>
           </div>
         </Link>
-
-        {/* Desktop navigation tabs: only visible above sm */}
-        <nav
-          className="hidden sm:flex items-center gap-1 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60"
-          aria-label="Menu Utama Desktop"
-        >
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  isActive
-                    ? "bg-white text-blue-700 shadow-2xs border border-slate-200/60"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
-                }`}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
 
         {/* Sales avatar shortcut to profile */}
         <Link

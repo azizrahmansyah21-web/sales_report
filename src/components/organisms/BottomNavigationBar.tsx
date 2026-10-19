@@ -2,8 +2,9 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import BottomNavItem from "@/components/molecules/BottomNavItem";
-import { PlusCircle, User } from "lucide-react";
+import { PlusCircle, User, LogOut } from "lucide-react";
 
 export const BottomNavigationBar: React.FC = () => {
   const pathname = usePathname();
@@ -23,10 +24,10 @@ export const BottomNavigationBar: React.FC = () => {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-md pb-[env(safe-area-inset-bottom,0px)] lg:hidden select-none"
       aria-label="Navigasi Bawah Sales"
     >
-      <div className="max-w-lg mx-auto flex items-center justify-around px-2 py-1">
+      <div className="max-w-md mx-auto flex items-center justify-around px-2 py-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
 
@@ -40,6 +41,21 @@ export const BottomNavigationBar: React.FC = () => {
             />
           );
         })}
+
+        {/* Tombol Keluar Cepat */}
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="relative flex flex-col items-center justify-center flex-1 h-14 py-1 text-slate-500 hover:text-red-600 font-medium transition-colors duration-150 active:scale-95 cursor-pointer"
+          aria-label="Keluar dari sistem"
+        >
+          <span className="flex items-center justify-center w-7 h-7 rounded-xl">
+            <LogOut className="w-5 h-5" />
+          </span>
+          <span className="text-[11px] leading-tight tracking-tight mt-0.5">
+            Keluar
+          </span>
+        </button>
       </div>
     </nav>
   );

@@ -4,18 +4,15 @@ import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import Avatar from "@/components/atoms/Avatar";
-import { Bell, Calendar, ChevronDown, Menu, Search } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 
 export interface AdminHeaderProps {
   title?: string;
   subtitle?: string;
-  onToggleSidebar?: () => void;
 }
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({
-  title = "Dashboard Analytics",
-  subtitle = "Portal Operasional Cabang UjungBatu",
-  onToggleSidebar,
+  title = "Portal Operasional",
 }) => {
   const { data: session } = useSession();
   const [searchVal, setSearchVal] = useState("");
@@ -27,27 +24,25 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
   return (
     <header className="h-16 bg-white border-b border-slate-200/90 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 gap-4">
-      {/* Left: Mobile hamburger & Breadcrumb with ToyotaLogo */}
+      {/* Left: Mobile Brand & Desktop Breadcrumb */}
       <div className="flex items-center gap-3">
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100"
-            aria-label="Buka menu navigasi"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* <div className="flex items-center gap-2">
+        {/* Mobile Toyota Logo & Branch Title */}
+        <div className="flex lg:hidden items-center gap-2 select-none">
           <ToyotaLogo size="sm" />
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-            <span className="text-slate-400">Portal Operasional</span>
-            <span className="text-slate-300">&gt;</span>
-            <span className="font-bold text-slate-800">Cabang UjungBatu</span>
+          <div className="flex flex-col leading-tight">
+            <span className="font-extrabold text-xs text-slate-900 tracking-tight">
+              Agung Toyota <span className="text-red-600 font-semibold text-[10px]">220</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">UjungBatu</span>
           </div>
-        </div> */}
+        </div>
+
+        {/* Desktop Breadcrumb */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs font-semibold text-slate-600 select-none">
+          <span className="text-slate-400">Portal Operasional</span>
+          <span className="text-slate-300">&gt;</span>
+          <span className="font-bold text-slate-800">{title}</span>
+        </div>
       </div>
 
       {/* Middle: Quick Search Input */}

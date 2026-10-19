@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import AdminSidebar from "@/components/organisms/AdminSidebar";
 import AdminHeader from "@/components/organisms/AdminHeader";
+import AdminBottomNav from "@/components/organisms/AdminBottomNav";
 
 export interface AdminDashboardLayoutProps {
   children: React.ReactNode;
@@ -19,43 +20,24 @@ export const AdminDashboardLayout: React.FC<AdminDashboardLayoutProps> = ({
   duplicateCount = 0,
   salesCount = 8,
 }) => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
   return (
     <div className="min-h-screen bg-slate-100 flex antialiased font-sans text-slate-900">
-      {/* Desktop Pinned Sidebar */}
-      <div className="hidden md:block shrink-0">
+      {/* Desktop & Wide Viewports Pinned Sidebar (>= 1024px) */}
+      <div className="hidden lg:block shrink-0">
         <AdminSidebar duplicateCount={duplicateCount} salesCount={salesCount} />
       </div>
 
-      {/* Mobile Sidebar Overlay Drawer */}
-      {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
-            onClick={() => setIsMobileSidebarOpen(false)}
-            aria-hidden="true"
-          />
-          {/* Sidebar Drawer */}
-          <div className="relative z-10 w-64 max-w-[80vw]">
-            <AdminSidebar duplicateCount={duplicateCount} />
-          </div>
-        </div>
-      )}
-
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminHeader
-          title={title}
-          subtitle={subtitle}
-          onToggleSidebar={() => setIsMobileSidebarOpen(true)}
-        />
+        <AdminHeader title={title} subtitle={subtitle} />
 
-        <main className="flex-1 bg-slate-50/80 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 bg-slate-50/80 p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto space-y-6">{children}</div>
         </main>
       </div>
+
+      {/* Mobile, Foldables, & Narrow Tablet Bottom Nav (< 1024px) */}
+      <AdminBottomNav duplicateCount={duplicateCount} />
     </div>
   );
 };

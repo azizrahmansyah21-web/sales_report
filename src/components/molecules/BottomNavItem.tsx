@@ -24,14 +24,14 @@ export const BottomNavItem: React.FC<BottomNavItemProps> = ({
       href={href}
       className={cn(
         "relative flex flex-col items-center justify-center flex-1 h-14 py-1 select-none transition-colors duration-150 active:scale-95",
-        isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
+        isActive ? "text-red-600 font-bold" : "text-slate-400 hover:text-slate-600 font-medium"
       )}
     >
       <div className="relative">
         <span
           className={cn(
             "flex items-center justify-center w-7 h-7 rounded-xl transition-all duration-150",
-            isActive && "text-blue-600"
+            isActive && "text-red-600"
           )}
         >
           {icon}
@@ -47,14 +47,14 @@ export const BottomNavItem: React.FC<BottomNavItemProps> = ({
       <span
         className={cn(
           "text-[11px] tracking-tight mt-0.5 font-medium transition-all",
-          isActive ? "font-bold text-blue-600" : "text-slate-500 font-normal"
+          isActive ? "font-bold text-red-600" : "text-slate-500 font-normal"
         )}
       >
         {label}
       </span>
 
       {isActive && (
-        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-blue-600" />
+        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-red-600" />
       )}
     </Link>
   );
