@@ -209,12 +209,12 @@ export default function LoginPage() {
               </button>
               <button
                 type="button"
-                onClick={() => fillPreset("143438A302")}
+                onClick={() => fillPreset("246238A319")}
                 className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-95 text-[11px] font-semibold text-slate-700 transition flex items-center justify-center gap-1"
-                title="Azis (Sales)"
+                title="Adrianto (Sales)"
               >
-                <span>Azis (Sales)</span>
-                {identifier === "143438A302" && <Check className="w-3 h-3 text-blue-600" />}
+                <span>Sales (Adrianto)</span>
+                {identifier === "246238A319" && <Check className="w-3 h-3 text-blue-600" />}
               </button>
             </div>
           </div>
