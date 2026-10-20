@@ -1,5 +1,4 @@
 import { PrismaClient, Role, SpkStatus } from "@prisma/client";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -214,7 +213,7 @@ async function main() {
   console.log("🌱 Laporan SPK H-1 — Mulai seeding database cabang 247...");
 
   // Dummy password hash untuk mematuhi schema User (auth login tetap passwordless via NIP/ADH)
-  const defaultPasswordHash = await bcrypt.hash("atub247", 10);
+  const defaultPasswordHash = "$2a$10$epYF.Gk9l7P6Wv5cZ.wKse21qA6TqGkJr9F9z5Kq9F9z5Kq9F9z5K";
 
   // 1. Bersihkan plan lama agar idempotent dan terhubung ke sales yang baru
   await prisma.planSPK.deleteMany({});
