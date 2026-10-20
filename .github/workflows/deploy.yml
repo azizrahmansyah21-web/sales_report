@@ -1,0 +1,25 @@
+name: Deploy On-Premise Production
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, on-premise]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy Docker Stack
+        working-directory: /var/www/apps/sales-report
+        run: |
+          git pull origin production
+          docker compose up -d --build sales-report-app
+          docker system prune -f
+
+      - name: Healthcheck Probe
+        run: |
+          sleep 10
+          curl -f http://127.0.0.1:3010/api/health || exit 1
