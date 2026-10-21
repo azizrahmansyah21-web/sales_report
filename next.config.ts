@@ -4,12 +4,16 @@ const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
     serverActions: {
-      allowedOrigins: ["*.trycloudflare.com", "*.cloudflareaccess.com"],
+      allowedOrigins: [
+        "planspk.com",
+        "*.planspk.com",
+        "*.trycloudflare.com",
+        "*.cloudflareaccess.com",
+      ],
     },
   },
-  // Izinkan tunnel di development
-  allowedDevOrigins: ["*.trycloudflare.com"],
+  // Izinkan tunnel & domain produksi
+  allowedDevOrigins: ["planspk.com", "*.planspk.com", "*.trycloudflare.com"],
 };
-
 
 export default nextConfig;
