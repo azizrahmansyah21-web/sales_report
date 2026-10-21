@@ -30,8 +30,8 @@ export const metadata: Metadata = {
     "Sistem Laporan Rencana SPK H-1 & Realisasi Closing Sales PT Agung Automall Cabang UjungBatu (Cabang Resmi 220)",
   applicationName: "Plan SPK H-1",
   icons: {
-    icon: "/icon.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/icon.jpg",
+    apple: "/apple-icon.jpg",
   },
   appleWebApp: {
     capable: true,
