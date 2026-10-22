@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import AdminDashboardLayout from "@/components/templates/AdminDashboardLayout";
 import Avatar from "@/components/atoms/Avatar";
 import SearchInput from "@/components/molecules/SearchInput";
@@ -15,8 +16,6 @@ import {
   Clock,
   XCircle,
   FileSpreadsheet,
-  Download,
-  Phone,
   Car,
   ChevronRight,
   Eye,
@@ -42,6 +41,7 @@ export default function AdminTeamClient({
   const now = new Date();
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [selectedPeriod, setSelectedPeriod] = useState<string>("CURRENT_MONTH");
+  const [isExporting, setIsExporting] = useState(false);
 
   // Ekstrak daftar bulan unik yang ada di seluruh dataset rencana
   const availableMonths = useMemo(() => {
@@ -165,63 +165,64 @@ export default function AdminTeamClient({
     return [...list].sort((a, b) => b.stats.berhasil - a.stats.berhasil);
   }, [periodMembers, searchQuery, filterTab]);
 
-  // Export Sales Performance to CSV (Compatible with Excel)
-  const handleExportCsv = () => {
-    const headers = [
-      "Peringkat",
-      "Nama Sales",
-      "NIP",
-      "Jabatan",
-      "No Telepon",
-      "Total Target Rencana",
-      "SPK Berhasil (Closing Sah)",
-      "Menunggu Hari H (Pending)",
-      "Belum Berhasil",
-      "SPK Unplanned",
-      "Kasus Duplikat",
-      "Gagal Berulang",
-      "Rasio Konversi (%)",
-    ];
+  // Ekspor Evaluasi Kinerja Tim Sales ke Excel (.xlsx) menggunakan SheetJS
+  const handleExportExcel = () => {
+    setIsExporting(true);
 
-    const rows = filteredMembers.map((m, idx) => {
-      const rank = idx + 1;
-      const nip = m.nip ? `"${m.nip}"` : `"-"`;
-      const title = m.title ? `"${m.title.replace(/"/g, '""')}"` : `"-"`;
-      const phone = m.phone ? `"${m.phone}"` : `"-"`;
-      return [
-        rank,
-        `"${m.name.replace(/"/g, '""')}"`,
-        nip,
-        title,
-        phone,
-        m.stats.total,
-        m.stats.berhasil,
-        m.stats.pending,
-        m.stats.belumBerhasil,
-        m.stats.unplanned,
-        m.stats.duplicates,
-        m.stats.repeatFailed,
-        `"${m.stats.successRate}%"`,
-      ].join(",");
-    });
+    try {
+      const rows = filteredMembers.map((m, idx) => {
+        return {
+          Peringkat: idx + 1,
+          "Nama Sales": m.name,
+          NIP: m.nip || "-",
+          Jabatan: m.title || "Sales Executive",
+          "Total Target Rencana": m.stats.total,
+          "Closing Sah (Berhasil)": m.stats.berhasil,
+          "Menunggu (Pending)": m.stats.pending,
+          "Belum Berhasil": m.stats.belumBerhasil,
+          "SPK Unplanned": m.stats.unplanned,
+          "Kasus Duplikat": m.stats.duplicates,
+          "Gagal Berulang": m.stats.repeatFailed,
+          "Rasio Konversi": `${m.stats.successRate}%`,
+        };
+      });
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const today = new Date().toISOString().split("T")[0];
-    link.href = url;
-    link.setAttribute("download", `Laporan_Performa_Sales_ATUB_${today}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+
+      // Konfigurasi lebar kolom otomatis untuk keterbacaan optimal
+      worksheet["!cols"] = [
+        { wch: 10 }, // Peringkat
+        { wch: 26 }, // Nama Sales
+        { wch: 16 }, // NIP
+        { wch: 22 }, // Jabatan
+        { wch: 18 }, // Total Target Rencana
+        { wch: 22 }, // Closing Sah (Berhasil)
+        { wch: 18 }, // Menunggu (Pending)
+        { wch: 16 }, // Belum Berhasil
+        { wch: 16 }, // SPK Unplanned
+        { wch: 16 }, // Kasus Duplikat
+        { wch: 16 }, // Gagal Berulang
+        { wch: 16 }, // Rasio Konversi
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Performa Tim Sales");
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      const filename = `Laporan_Performa_Sales_Cabang220_${todayStr}.xlsx`;
+
+      XLSX.writeFile(workbook, filename);
+    } catch (err) {
+      console.error("[handleExportExcel] Kendala saat membuat file Excel:", err);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
     <AdminDashboardLayout
       title="Manajemen Tim Sales"
-      subtitle="Evaluasi Kinerja Tim Sales & Akuntabilitas Target SPK H-1 Cabang 247"
+      subtitle="Evaluasi Kinerja Tim Sales & Akuntabilitas Target SPK H-1 Cabang 220"
       duplicateCount={totalDuplicates}
       salesCount={totalSales}
     >
@@ -271,12 +272,13 @@ export default function AdminTeamClient({
 
             <button
               type="button"
-              onClick={handleExportCsv}
-              className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-2 transition-colors shadow-2xs cursor-pointer"
-              title="Unduh laporan performa sales dalam format file CSV / Excel"
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold inline-flex items-center gap-2 transition-colors shadow-2xs cursor-pointer"
+              title="Unduh laporan performa sales dalam format file Excel (.xlsx)"
             >
-              <Download className="w-4 h-4" />
-              <span>Ekspor Kinerja (CSV)</span>
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>{isExporting ? "Mengekspor..." : "Ekspor Kinerja (.xlsx)"}</span>
             </button>
           </div>
         </div>
@@ -425,7 +427,6 @@ export default function AdminTeamClient({
                 <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3.5 px-4 text-center w-12">Peringkat</th>
                   <th className="py-3.5 px-4">Sales</th>
-                  <th className="py-3.5 px-4">Kontak</th>
                   <th className="py-3.5 px-4 text-center">Total Rencana</th>
                   <th className="py-3.5 px-4 text-center">Closing Sah</th>
                   <th className="py-3.5 px-4 text-center">Menunggu</th>
@@ -487,23 +488,6 @@ export default function AdminTeamClient({
                           </div>
                         </td>
 
-                        {/* Contact */}
-                        <td className="py-3.5 px-4 whitespace-nowrap">
-                          {member.phone ? (
-                            <a
-                              href={`https://wa.me/${member.phone.replace(/[^0-9]/g, "")}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-slate-600 hover:text-emerald-700 font-mono text-[11px] transition-colors"
-                              title="Hubungi via WhatsApp"
-                            >
-                              <Phone className="w-3 h-3 text-emerald-600" />
-                              <span>{member.phone}</span>
-                            </a>
-                          ) : (
-                            <span className="text-slate-400 text-[11px] italic">-</span>
-                          )}
-                        </td>
 
                         {/* Total Plans */}
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
@@ -635,7 +619,7 @@ export default function AdminTeamClient({
                   })
                 ) : (
                   <tr>
-                    <td colSpan={11} className="text-center py-12 text-slate-400 space-y-2">
+                    <td colSpan={10} className="text-center py-12 text-slate-400 space-y-2">
                       <Users className="w-8 h-8 text-slate-300 mx-auto" />
                       <p className="font-semibold text-xs text-slate-600">
                         Tidak ada personel sales yang cocok dengan filter.
