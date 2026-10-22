@@ -83,6 +83,7 @@ export async function checkAndAlertLatePlans(): Promise<void> {
       include: {
         sales: {
           select: {
+            id: true,
             name: true,
             nip: true,
           },
@@ -96,15 +97,52 @@ export async function checkAndAlertLatePlans(): Promise<void> {
     for (const plan of latePlans) {
       if (!sentIds.has(plan.id)) {
         console.log(
-          `[Watch Late] Mendeteksi entri susulan: Customer "${plan.customerName}" (Sales: ${plan.sales.name}). Mengirim notifikasi...`
+          `[Watch Late] Mendeteksi entri susulan: Customer "${plan.customerName}" (Sales: ${plan.sales.name}). Memperbarui rekap...`
         );
 
-        const alertText = formatLatePlanAlert(plan);
+        // Ambil seluruh data sales dan seluruh plan hari ini untuk rekap 2 bagian yang terupdate
+        const allSales = await prisma.user.findMany({
+          where: { role: "SALES" },
+          select: { id: true, name: true, nip: true },
+          orderBy: { name: "asc" },
+        });
+
+        const allPlansToday = await prisma.planSPK.findMany({
+          where: {
+            planDate: {
+              gte: startOfDay,
+              lte: endOfDay,
+            },
+          },
+          include: {
+            sales: {
+              select: {
+                id: true,
+                name: true,
+                nip: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        });
+
+        const submittedSalesIds = new Set(allPlansToday.map((p) => p.sales.id));
+        const unsubmittedSales = allSales.filter((s) => !submittedSalesIds.has(s.id));
+
+        const alertText = formatLatePlanAlert(
+          plan,
+          allPlansToday,
+          unsubmittedSales,
+          startOfDay
+        );
         const isSent = await sendGroupMessage(alertText);
 
         if (isSent) {
           saveSentPlanId(config.cacheAlertsFile, plan.id);
           sentIds.add(plan.id);
+          console.log(`[Watch Late] Rekap susulan terkirim untuk ${plan.sales.name}.`);
         }
       }
     }

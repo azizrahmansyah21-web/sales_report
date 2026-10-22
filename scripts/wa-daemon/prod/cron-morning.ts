@@ -88,6 +88,20 @@ export async function checkAndRunMorningBroadcast(): Promise<void> {
     const endOfDay = new Date(dateObj);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // 1. Ambil seluruh data sales resmi yang aktif
+    const allSales = await prisma.user.findMany({
+      where: { role: "SALES" },
+      select: {
+        id: true,
+        name: true,
+        nip: true,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    // 2. Ambil rencana SPK untuk hari ini
     const plans = await prisma.planSPK.findMany({
       where: {
         planDate: {
@@ -98,6 +112,7 @@ export async function checkAndRunMorningBroadcast(): Promise<void> {
       include: {
         sales: {
           select: {
+            id: true,
             name: true,
             nip: true,
           },
@@ -108,7 +123,11 @@ export async function checkAndRunMorningBroadcast(): Promise<void> {
       },
     });
 
-    const message = formatMorningBroadcast(plans, startOfDay);
+    // 3. Pisahkan daftar sales yang belum mengisi
+    const submittedSalesIds = new Set(plans.map((p) => p.sales.id));
+    const unsubmittedSales = allSales.filter((s) => !submittedSalesIds.has(s.id));
+
+    const message = formatMorningBroadcast(plans, unsubmittedSales, startOfDay);
     const isSent = await sendGroupMessage(message);
 
     if (isSent) {

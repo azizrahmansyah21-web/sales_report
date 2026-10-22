@@ -1,0 +1,23 @@
+# ==============================================================================
+# Dockerfile for WhatsApp Baileys Daemon (Agung Toyota UjungBatu Cabang 220)
+# ==============================================================================
+FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat openssl
+
+WORKDIR /app
+
+# Salin dependensi dan skema prisma
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma/
+
+# Install dependensi (termasuk tsx & prisma client)
+RUN npm ci && npx prisma generate
+
+# Salin berkas skrip dan konfigurasi TypeScript
+COPY tsconfig.json ./
+COPY scripts ./scripts/
+
+ENV NODE_ENV=production
+
+# Menjalankan daemon polling berkala
+CMD ["npm", "run", "wa:daemon"]
