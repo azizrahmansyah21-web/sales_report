@@ -16,7 +16,8 @@
     "wa:setup": "tsx scripts/wa-daemon/preprod/setup-qr.ts",
     "wa:find-groups": "tsx scripts/wa-daemon/preprod/find-groups.ts",
     "wa:daemon": "tsx scripts/wa-daemon/prod/index.ts",
-    "wa:test": "tsx scripts/wa-daemon/prod/test-send.ts"
+    "wa:test": "tsx scripts/wa-daemon/prod/test-send.ts",
+    "wa:broadcast-video": "tsx scripts/wa-daemon/prod/broadcast-video.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

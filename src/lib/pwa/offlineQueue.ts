@@ -57,6 +57,20 @@ export async function saveOfflinePlan(data: {
   planDate: string;
 }): Promise<OfflinePlanItem> {
   const db = await openOfflineDB();
+
+  // Deduplikasi antrean lokal: jangan simpan item ganda jika data identik sudah menunggu
+  const existingQueue = await getPendingOfflinePlans();
+  const existing = existingQueue.find(
+    (item) =>
+      item.customerName.toLowerCase().trim() === data.customerName.toLowerCase().trim() &&
+      item.unitName.toLowerCase().trim() === data.unitName.toLowerCase().trim() &&
+      item.planDate === data.planDate
+  );
+
+  if (existing) {
+    return existing;
+  }
+
   const item: OfflinePlanItem = {
     id:
       typeof crypto !== "undefined" && crypto.randomUUID

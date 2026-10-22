@@ -217,6 +217,7 @@ export default function InputFormClient({
   const [planDate, setPlanDate] = useState(initialSmartDate.defaultPlanDate);
 
   const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedPlan, setSubmittedPlan] = useState<PlanSPK | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -255,7 +256,13 @@ export default function InputFormClient({
 
   useEffect(() => {
     queueMicrotask(() => {
-      getPendingCount().then((count) => setOfflineCount(count));
+      getPendingCount().then((count) => {
+        setOfflineCount(count);
+        // Jika saat halaman dimuat ada antrean tertunda dan perangkat online, sinkronkan otomatis
+        if (count > 0 && typeof navigator !== "undefined" && navigator.onLine) {
+          triggerAutoSync();
+        }
+      });
     });
 
     const handleOnline = () => {
@@ -279,74 +286,87 @@ export default function InputFormClient({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Cegah submit ganda jika transaksi sedang berjalan
+    if (isPending || isSubmitting) return;
+
     setErrorMessage(null);
     setOfflineSavedNotice(false);
     setSyncNotice(null);
 
-    if (!customerName.trim()) {
+    const cleanCustomer = customerName.trim();
+    const cleanUnit = unitName.trim();
+
+    if (!cleanCustomer) {
       setErrorMessage("Nama pelanggan wajib diisi.");
       return;
     }
 
-    if (!unitName.trim()) {
+    if (!cleanUnit) {
       setErrorMessage("Pilih model unit Toyota terlebih dahulu.");
       return;
     }
 
+    setIsSubmitting(true);
+
     startTransition(async () => {
-      // 1. Tangani jika koneksi browser terdeteksi offline
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        try {
-          await saveOfflinePlan({
-            customerName: customerName.trim(),
-            unitName: unitName.trim(),
-            planDate,
-          });
-          const count = await getPendingCount();
-          setOfflineCount(count);
-          setOfflineSavedNotice(true);
-          setCustomerName("");
-          setUnitName("");
-        } catch {
-          setErrorMessage("Gagal menyimpan ke memori lokal perangkat.");
-        }
-        return;
-      }
-
-      // 2. Jika online, coba kirim ke server Action dengan fallback ke antrean offline
       try {
-        const result = await createPlanSpk({
-          customerName: customerName.trim(),
-          unitName: unitName.trim(),
-          planDate,
-        });
-
-        if (!result.success) {
-          setErrorMessage(result.error);
+        // 1. Tangani jika koneksi browser terdeteksi offline
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          try {
+            await saveOfflinePlan({
+              customerName: cleanCustomer,
+              unitName: cleanUnit,
+              planDate,
+            });
+            const count = await getPendingCount();
+            setOfflineCount(count);
+            setOfflineSavedNotice(true);
+            setCustomerName("");
+            setUnitName("");
+          } catch {
+            setErrorMessage("Gagal menyimpan ke memori lokal perangkat.");
+          }
           return;
         }
 
-        setSubmittedPlan(result.data);
-        setCustomerName("");
-        setUnitName("");
-      } catch {
-        // Terjadi kegagalan jaringan saat pengiriman berlangsung (blank spot mendadak)
+        // 2. Jika online, coba kirim ke server Action dengan fallback ke antrean offline
         try {
-          await saveOfflinePlan({
-            customerName: customerName.trim(),
-            unitName: unitName.trim(),
+          const result = await createPlanSpk({
+            customerName: cleanCustomer,
+            unitName: cleanUnit,
             planDate,
           });
-          const count = await getPendingCount();
-          setOfflineCount(count);
-          setOfflineSavedNotice(true);
+
+          if (!result.success) {
+            setErrorMessage(result.error);
+            return;
+          }
+
+          setSubmittedPlan(result.data);
           setCustomerName("");
           setUnitName("");
         } catch {
-          setErrorMessage(
-            "Koneksi jaringan terputus dan gagal menyimpan antrean lokal."
-          );
+          // Terjadi kegagalan jaringan saat pengiriman berlangsung (blank spot mendadak)
+          try {
+            await saveOfflinePlan({
+              customerName: cleanCustomer,
+              unitName: cleanUnit,
+              planDate,
+            });
+            const count = await getPendingCount();
+            setOfflineCount(count);
+            setOfflineSavedNotice(true);
+            setCustomerName("");
+            setUnitName("");
+          } catch {
+            setErrorMessage(
+              "Koneksi jaringan terputus dan gagal menyimpan antrean lokal."
+            );
+          }
         }
+      } finally {
+        setIsSubmitting(false);
       }
     });
   };
@@ -533,7 +553,8 @@ export default function InputFormClient({
               variant="primary"
               size="lg"
               className="w-full min-h-[48px] shadow-md shadow-blue-600/20"
-              isLoading={isPending}
+              isLoading={isPending || isSubmitting}
+              disabled={isPending || isSubmitting}
               rightIcon={<Send className="w-4 h-4" />}
             >
               Simpan Rencana SPK

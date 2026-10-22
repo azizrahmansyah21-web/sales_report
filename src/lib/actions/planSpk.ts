@@ -132,7 +132,34 @@ export async function createPlanSpk(
       }
     }
 
-    // Deteksi duplikat: cari riwayat sebelumnya dengan nama pelanggan serupa di cabang
+    // 1. Proteksi Idempotensi (Anti-Double Submit & Anti-Sync Duplicate):
+    // Jika sales yang sama sudah memiliki rencana SPK aktif (PENDING) untuk customer yang sama,
+    // unit yang sama, dan target tanggal yang sama, kembalikan data yang sudah ada (jangan buat baris ganda).
+    const existingPendingPlan = await prisma.planSPK.findFirst({
+      where: {
+        salesId: userId,
+        customerName: {
+          equals: cleanCustomerName,
+          mode: "insensitive",
+        },
+        unitName: {
+          equals: unitName.trim(),
+          mode: "insensitive",
+        },
+        planDate: finalPlanDate,
+        spkStatus: "PENDING",
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (existingPendingPlan) {
+      safeRevalidatePath("/input");
+      safeRevalidatePath("/admin/prospects");
+      return { success: true, data: existingPendingPlan };
+    }
+
+    // 2. Deteksi duplikat riwayat / lintas sales di cabang:
+    // Cari riwayat sebelumnya dengan nama pelanggan serupa di cabang
     const previousPlans = await prisma.planSPK.findMany({
       where: {
         customerName: {
