@@ -35,11 +35,25 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Path berkas video yang dipilih
-  const videoPath = path.resolve("D:/Magang/Sales_Report/WhatsApp Video 2026-10-23 at 02.27.41.mp4");
+  // Pencarian berkas video target (kompatibel Server Linux & Windows Laptop)
+  const candidatePaths = [
+    path.resolve(process.cwd(), "tutorial.mp4"),
+    path.resolve("/var/www/apps/sales-report/tutorial.mp4"),
+    path.resolve(process.cwd(), "../WhatsApp Video 2026-10-23 at 02.27.41.mp4"),
+    path.resolve("D:/Magang/Sales_Report/WhatsApp Video 2026-10-23 at 02.27.41.mp4"),
+  ];
 
-  if (!fs.existsSync(videoPath)) {
-    console.error(`❌ Berkas video tidak ditemukan di: ${videoPath}`);
+  let videoPath = "";
+  for (const p of candidatePaths) {
+    if (fs.existsSync(p)) {
+      videoPath = p;
+      break;
+    }
+  }
+
+  if (!videoPath) {
+    console.error("❌ Berkas video tidak ditemukan. Pastikan file 'tutorial.mp4' ada di folder kerja.");
+    console.error("   Lokasi yang diperiksa:\n" + candidatePaths.map((c) => `   - ${c}`).join("\n"));
     process.exit(1);
   }
 
