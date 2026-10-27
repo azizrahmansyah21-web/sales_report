@@ -12,7 +12,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:index": "tsx scripts/add-lower-index.ts",
-    "user:add-tiwi": "tsx scripts/add-admin-tiwi.ts",
+    "user:add-tiwi": "node scripts/add-admin-tiwi.cjs",
     "postinstall": "prisma generate",
     "wa:setup": "tsx scripts/wa-daemon/preprod/setup-qr.ts",
     "wa:find-groups": "tsx scripts/wa-daemon/preprod/find-groups.ts",
