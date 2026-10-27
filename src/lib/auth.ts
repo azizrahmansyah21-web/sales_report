@@ -22,6 +22,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const cleanId = identifier.trim();
         const normalized = cleanId.toLowerCase();
 
+        // Shortcut Branch Manager (Pimpinan Tertinggi Cabang 220): "branchmanager", "brm", "bm"
+        if (
+          normalized === "branchmanager" ||
+          normalized === "brm" ||
+          normalized === "bm" ||
+          normalized === "branch manager"
+        ) {
+          const bmUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { username: "branchmanager" },
+                { username: "brm" },
+                { title: { contains: "Branch Manager", mode: "insensitive" } },
+              ],
+              isActive: true,
+            },
+          });
+          if (bmUser) {
+            return {
+              id: bmUser.id,
+              name: bmUser.name,
+              email: bmUser.email,
+              username: bmUser.username,
+              role: bmUser.role,
+              title: bmUser.title,
+            };
+          }
+        }
+
         // 1. Khusus Bapak Administration Head: login cepat dengan "ADH"
         if (normalized === "adh" || normalized === "admin head") {
           const adhUser = await prisma.user.findFirst({

@@ -128,49 +128,58 @@ interface DealHistoryProps {
 }
 
 function DealHistorySection({ deals }: DealHistoryProps) {
+  const [isOpen, setIsOpen] = useState(false);
   if (deals.length === 0) return null;
 
   return (
-    <section
-      aria-label="Riwayat Closing Berhasil"
-      className="space-y-2.5 pt-1"
-    >
-      <div className="flex items-center gap-2">
-        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
-          Riwayat Closing Sah Anda ({deals.length} Terakhir)
-        </h3>
-      </div>
+    <section aria-label="Riwayat Closing Berhasil" className="pt-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition-colors cursor-pointer text-left"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="text-xs font-bold text-slate-700 truncate">
+            Riwayat Closing Sah Anda ({deals.length})
+          </span>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-500 shrink-0">
+          {isOpen ? "Tutup ▲" : "Lihat ▼"}
+        </span>
+      </button>
 
-      <div className="space-y-2">
-        {deals.map((deal) => {
-          const dateFormatted = formatDisplayDateWIB(deal.planDate);
-          return (
-            <div
-              key={deal.id}
-              className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200 rounded-xl px-3.5 py-2.5 gap-2"
-            >
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-900 truncate">
-                  {deal.customerName}
-                </p>
-                <p className="text-[11px] text-slate-600 truncate mt-0.5">
-                  {deal.unitName}
-                </p>
+      {isOpen && (
+        <div className="space-y-2 mt-2">
+          {deals.map((deal) => {
+            const dateFormatted = formatDisplayDateWIB(deal.planDate);
+            return (
+              <div
+                key={deal.id}
+                className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200 rounded-xl px-3.5 py-2.5 gap-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {deal.customerName}
+                  </p>
+                  <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                    {deal.unitName}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                    <CheckCircle2 className="w-2.5 h-2.5" />
+                    DEAL
+                  </span>
+                  <p className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    {dateFormatted}
+                  </p>
+                </div>
               </div>
-              <div className="text-right shrink-0">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
-                  <CheckCircle2 className="w-2.5 h-2.5" />
-                  DEAL
-                </span>
-                <p className="text-[10px] text-slate-400 font-mono mt-0.5">
-                  {dateFormatted}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -374,16 +383,6 @@ export default function InputFormClient({
   return (
     <MobilePwaLayout salesName={salesName}>
       <div className="space-y-4">
-        {/* Banner Identitas & Intisari Input */}
-        <div className="rounded-2xl bg-white border border-slate-200/90 p-4 shadow-2xs">
-          <h2 className="text-base font-black text-slate-900 tracking-tight">
-            Input Rencana SPK H-1
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Daftarkan rencana prospek SPK esok hari untuk evaluasi target operasional cabang.
-          </p>
-        </div>
-
         {/* Indikator Status Offline Perangkat */}
         {!isOnline && (
           <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-900 text-white text-xs font-semibold shadow-xs animate-in fade-in duration-200">
@@ -501,7 +500,6 @@ export default function InputFormClient({
           <FormField
             label="Nama Pelanggan / Prospek"
             required
-            hint="Masukkan nama lengkap customer yang akan closing SPK"
           >
             <Input
               type="text"
@@ -519,7 +517,6 @@ export default function InputFormClient({
           <FormField
             label="Model Kendaraan Toyota"
             required
-            hint="Pilih unit yang diminati customer"
           >
             <Select
               options={TOYOTA_MODELS}
@@ -536,7 +533,6 @@ export default function InputFormClient({
           <FormField
             label="Target Tanggal SPK"
             required
-            hint="Pilih tanggal target realisasi SPK cabang"
           >
             <DateToggle
               selected={planDate}

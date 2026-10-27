@@ -133,8 +133,9 @@ export async function createPlanSpk(
     }
 
     // 1. Proteksi Idempotensi (Anti-Double Submit & Anti-Sync Duplicate):
-    // Jika sales yang sama sudah memiliki rencana SPK aktif (PENDING) untuk customer yang sama,
-    // unit yang sama, dan target tanggal yang sama, kembalikan data yang sudah ada (jangan buat baris ganda).
+    // Jika sales yang sama sudah memiliki rencana SPK aktif (PENDING) untuk customer yang sama
+    // dalam kurun waktu 15 menit terakhir, kembalikan record yang ada tanpa membuat baris baru.
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const existingPendingPlan = await prisma.planSPK.findFirst({
       where: {
         salesId: userId,
@@ -142,12 +143,10 @@ export async function createPlanSpk(
           equals: cleanCustomerName,
           mode: "insensitive",
         },
-        unitName: {
-          equals: unitName.trim(),
-          mode: "insensitive",
-        },
-        planDate: finalPlanDate,
         spkStatus: "PENDING",
+        createdAt: {
+          gte: fifteenMinutesAgo,
+        },
       },
       orderBy: { createdAt: "desc" },
     });

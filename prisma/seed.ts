@@ -2,9 +2,19 @@ import { PrismaClient, Role, SpkStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// Data Resmi 22 Karyawan & Pimpinan Cabang 247 — Agung Toyota UjungBatu
-// Bersumber langsung dari DATA SALESMAN TO AZIS.xlsx
+// Data Resmi 23 Karyawan & Pimpinan Cabang 220 — Agung Toyota UjungBatu
+// Bersumber langsung dari DATA SALESMAN TO AZIS.xlsx & Struktur Pimpinan Cabang
 const OFFICIAL_PERSONNEL = [
+  // ─── 0. BRANCH MANAGER (PIMPINAN TERTINGGI CABANG 220) ────────────────────
+  {
+    nip: "010101A220",
+    name: "BRANCH MANAGER",
+    username: "branchmanager",
+    title: "Branch Manager",
+    role: Role.ADMIN,
+    email: "branchmanager@atujungbatu.com",
+    phone: "081268000100",
+  },
   // ─── 1. ADMINISTRATION HEAD ───────────────────────────────────────────────
   {
     nip: "050507A403",
