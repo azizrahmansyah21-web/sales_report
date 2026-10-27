@@ -179,7 +179,7 @@ export default function ProfilClient({
                 {berhasilCount} Unit
               </p>
               <p className="text-[10px] text-slate-400 mt-1">
-                {pendingCount} Menunggu Hari H
+                {pendingCount} Menunggu
               </p>
             </div>
 

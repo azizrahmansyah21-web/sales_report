@@ -137,7 +137,7 @@ export async function sendPlanSpkNotification(
       `Customer     : *${payload.customerName}*`,
       `Model Unit   : *${payload.unitName}*`,
       "──────────────────────────────",
-      "Status: Menunggu realisasi closing di Hari H.",
+      "Status: Menunggu konfirmasi closing.",
     ].join("\n");
 
     console.log("[WhatsApp Service] Mengirimkan pesan siaran ke grup:", message);

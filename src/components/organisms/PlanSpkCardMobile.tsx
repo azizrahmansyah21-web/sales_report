@@ -153,7 +153,7 @@ export const PlanSpkCardMobile: React.FC<PlanSpkCardMobileProps> = ({ plan }) =>
             <span className="text-slate-400">Jadwal Realisasi:</span>
             <span className="font-semibold text-slate-800">
               {isPending
-                ? "Menunggu penentuan hasil di Hari H"
+                ? "Menunggu konfirmasi closing"
                 : isSuccess
                 ? "Closing terverifikasi SPV"
                 : "Belum tercapai closing"}

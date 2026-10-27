@@ -82,7 +82,7 @@ export default function AdminProspectsClient({
   const [selectedSalesId, setSelectedSalesId] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [onlyFlagged, setOnlyFlagged] = useState(false);
-  const [todayInputOnly, setTodayInputOnly] = useState(false);
+  const [todayInputOnly, setTodayInputOnly] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState<string>("ALL");
   const [selectedDate, setSelectedDate] = useState<string>("");
 
@@ -486,7 +486,7 @@ export default function AdminProspectsClient({
 
     try {
       const rows = filteredPlans.map((p, idx) => {
-        let statusLabel = "Menunggu Hari H";
+        let statusLabel = "Menunggu";
         if (p.spkStatus === "BERHASIL") statusLabel = "SPK Berhasil (Closing)";
         if (p.spkStatus === "BELUM_BERHASIL") statusLabel = "Belum Berhasil";
 
@@ -610,7 +610,7 @@ export default function AdminProspectsClient({
             <p className="text-xl font-black text-amber-700 mt-1">
               {metrics.pending}
             </p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Menunggu Hari H</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Menunggu</p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs">
@@ -753,7 +753,7 @@ export default function AdminProspectsClient({
                 className="min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
               >
                 <option value="ALL">Semua Status SPK</option>
-                <option value="PENDING">Menunggu Hari H</option>
+                <option value="PENDING">Menunggu</option>
                 <option value="BERHASIL">SPK Berhasil</option>
                 <option value="BELUM_BERHASIL">Belum Berhasil</option>
               </select>
@@ -918,7 +918,7 @@ export default function AdminProspectsClient({
                               </span>
                             ) : (
                               <span className="inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300">
-                                Menunggu Hari H
+                                Menunggu
                               </span>
                             )
                           ) : (
@@ -938,7 +938,7 @@ export default function AdminProspectsClient({
                                   : "bg-amber-50 text-amber-800 border-amber-300 focus:ring-2 focus:ring-amber-200"
                               }`}
                             >
-                              <option value="PENDING">Menunggu Hari H</option>
+                              <option value="PENDING">Menunggu</option>
                               <option value="BERHASIL">SPK Berhasil</option>
                               <option value="BELUM_BERHASIL">Belum Berhasil</option>
                             </select>
@@ -1140,7 +1140,6 @@ export default function AdminProspectsClient({
                     }`}
                   >
                     <span>Menunggu</span>
-                    <span className="text-[10px] font-normal text-amber-700">Hari H</span>
                   </button>
 
                   <button

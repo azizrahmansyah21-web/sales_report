@@ -131,7 +131,7 @@ export default function AdminDashboardClient({
           />
 
           <MetricCard
-            title="Menunggu Hari H"
+            title="Menunggu"
             value={pendingPlans}
             subtitle="Menunggu Evaluasi Realisasi"
             icon={<Clock className="w-4 h-4 text-amber-600" />}

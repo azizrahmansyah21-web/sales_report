@@ -51,6 +51,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
 
+        // Shortcut Admin Tiwi (Sales Administration): "tiwi", "admin.tiwi", "admin tiwi"
+        if (
+          normalized === "tiwi" ||
+          normalized === "admin.tiwi" ||
+          normalized === "admin tiwi"
+        ) {
+          const tiwiUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { username: "tiwi" },
+                { username: "admin.tiwi" },
+                { name: { contains: "tiwi", mode: "insensitive" } },
+              ],
+              role: "ADMIN",
+              isActive: true,
+            },
+          });
+          if (tiwiUser) {
+            return {
+              id: tiwiUser.id,
+              name: tiwiUser.name,
+              email: tiwiUser.email,
+              username: tiwiUser.username,
+              role: tiwiUser.role,
+              title: tiwiUser.title,
+            };
+          }
+        }
+
         // 1. Khusus Bapak Administration Head: login cepat dengan "ADH"
         if (normalized === "adh" || normalized === "admin head") {
           const adhUser = await prisma.user.findFirst({

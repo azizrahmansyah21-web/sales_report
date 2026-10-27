@@ -35,6 +35,15 @@ const OFFICIAL_PERSONNEL = [
     email: "fuji.safariyan@atujungbatu.com",
     phone: "081268000102",
   },
+  {
+    nip: "154550A319",
+    name: "PERTIWI",
+    username: "tiwi",
+    title: "Sales Administration",
+    role: Role.ADMIN,
+    email: "pertiwi@atujungbatu.com",
+    phone: "081268000109",
+  },
   // ─── 3. SALES SUPERVISOR (2 SPV) ─────────────────────────────────────────
   {
     nip: "101257A311",
