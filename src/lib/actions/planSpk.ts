@@ -3,7 +3,7 @@
  * Agung Toyota UjungBatu (Cabang 220)
  *
  * Modul ini menangani:
- * 1. Pendaftaran rencana SPK baru oleh Sales dengan penegakan batas waktu (cutoff) 16:00 WIB.
+ * 1. Pendaftaran rencana SPK baru oleh Sales dengan penegakan batas waktu (cutoff) 17:00 WIB.
  * 2. Deteksi otomatis prospek duplikat dan gagal berulang di basis data cabang.
  * 3. Verifikasi realisasi closing dan catatan evaluasi oleh SPV, ADH, dan Admin.
  * 4. Pengiriman notifikasi WhatsApp Group dengan proteksi serverless Vercel.
@@ -22,7 +22,7 @@ import {
   createUnplannedSpkSchema,
 } from "@/lib/validations/planSpk";
 import {
-  isPastCutoff16WIB,
+  isPastCutoff17WIB,
   getDateStringWIB,
   getTodayRangeWIB,
 } from "@/lib/utils/wibDate";
@@ -84,7 +84,7 @@ export interface ActionSessionUser {
  * Menyimpan data rencana SPK H-1 baru yang diinput oleh Sales.
  * Menerapkan aturan operasional Cabang 220:
  * - Mengambil User ID langsung dari sesi terotentikasi server (Security IDOR Patch).
- * - Jika waktu submit sudah >= 16:00 WIB dan tanggal yang dikirim adalah hari ini,
+ * - Jika waktu submit sudah >= 17:00 WIB dan tanggal yang dikirim adalah hari ini,
  *   tanggal rencana otomatis dialihkan ke H+1 (esok hari).
  * - Mendeteksi apakah nama pelanggan sudah pernah diajukan sebelumnya (duplikat).
  * - Menandai status gagal berulang jika prospek sebelumnya berstatus BELUM_BERHASIL.
@@ -119,14 +119,14 @@ export async function createPlanSpk(
     const { customerName, unitName, planDate } = parsed.data;
     const cleanCustomerName = customerName.trim();
 
-    // Penegakan aturan Cutoff 16:00 WIB di sisi server
+    // Penegakan aturan Cutoff 17:00 WIB di sisi server
     const todayStrWIB = getDateStringWIB(0);
     const tomorrowStrWIB = getDateStringWIB(1);
     let finalPlanDate = planDate;
 
-    if (isPastCutoff16WIB()) {
+    if (isPastCutoff17WIB()) {
       const submittedDateStr = planDate.toISOString().split("T")[0];
-      // Jika submit setelah 16:00 WIB dan memilih hari ini, alihkan ke esok hari
+      // Jika submit setelah 17:00 WIB dan memilih hari ini, alihkan ke esok hari
       if (submittedDateStr <= todayStrWIB) {
         finalPlanDate = new Date(`${tomorrowStrWIB}T00:00:00.000Z`);
       }

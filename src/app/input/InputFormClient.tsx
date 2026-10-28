@@ -112,7 +112,7 @@ function DateToggle({ selected, onSelect, disabled, smartDate }: DateToggleProps
         <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex items-center gap-1.5 leading-snug">
           <Clock className="w-3.5 h-3.5 shrink-0 text-amber-700" />
           <span>
-            Waktu operasional sudah melewati pukul 16:00 WIB. Pendaftaran SPK
+            Waktu operasional sudah melewati pukul 17:00 WIB. Pendaftaran SPK
             otomatis dialihkan untuk rencana hari esok.
           </span>
         </p>

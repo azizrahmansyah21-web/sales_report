@@ -23,7 +23,7 @@ export interface SmartDateOptionsWIB {
   today: SmartDateOptionItem;
   /** Pilihan tanggal besok (H-1) */
   tomorrow: SmartDateOptionItem;
-  /** Indikator apakah opsi hari ini dinonaktifkan (aktif jika sudah melewati jam 16:00 WIB) */
+  /** Indikator apakah opsi hari ini dinonaktifkan (aktif jika sudah melewati jam 17:00 WIB) */
   isTodayDisabled: boolean;
   /** Nilai default tanggal yang dipilih secara otomatis */
   defaultPlanDate: string;
@@ -31,8 +31,8 @@ export interface SmartDateOptionsWIB {
   currentHourWIB: number;
 }
 
-/** Batas jam penutupan input rencana SPK hari ini di Cabang 220 (16:00 WIB) */
-export const CUTOFF_HOUR_WIB = 16;
+/** Batas jam penutupan input rencana SPK hari ini di Cabang 220 (17:00 WIB) */
+export const CUTOFF_HOUR_WIB = 17;
 
 /** Offset zona waktu WIB dalam milidetik (UTC+7) */
 export const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
@@ -49,17 +49,20 @@ export function getNowWIB(baseDate: Date = new Date()): Date {
 }
 
 /**
- * Memeriksa apakah waktu saat ini di WIB sudah mencapai atau melewati batas jam 16:00 WIB.
- * Sesuai aturan operasional Cabang 220, setelah pukul 16:00 WIB sales tidak lagi dapat
+ * Memeriksa apakah waktu saat ini di WIB sudah mencapai atau melewati batas jam 17:00 WIB.
+ * Sesuai aturan operasional Cabang 220, setelah pukul 17:00 WIB sales tidak lagi dapat
  * memilih target hari ini dan diwajibkan menyusun rencana untuk hari esok.
  *
  * @param baseDate - Opsional tanggal rujukan
- * @returns true jika jam saat ini di WIB >= 16:00
+ * @returns true jika jam saat ini di WIB >= 17:00
  */
-export function isPastCutoff16WIB(baseDate: Date = new Date()): boolean {
+export function isPastCutoff17WIB(baseDate: Date = new Date()): boolean {
   const wib = getNowWIB(baseDate);
   return wib.getHours() >= CUTOFF_HOUR_WIB;
 }
+
+/** Alias kompatibilitas transisi */
+export const isPastCutoff16WIB = isPastCutoff17WIB;
 
 /**
  * Menghasilkan string tanggal YYYY-MM-DD berdasarkan offset hari dari hari ini di WIB.

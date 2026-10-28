@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     `Halo rekan-rekan Sales & Manajemen Agung Toyota UjungBatu! 👋\n\n` +
     `Berikut adalah video panduan pengisian laporan rencana prospek SPK melalui aplikasi web resmi cabang:\n\n` +
     `📱 *Poin Penting untuk Sales:*\n` +
-    `1. Input rencana SPK H-1 ditutup setiap pukul 16:00 WIB.\n` +
+    `1. Input rencana SPK H-1 ditutup setiap pukul 17:00 WIB.\n` +
     `2. Mendukung mode offline (tetap bisa isi saat sinyal lemah/pameran).\n` +
     `3. Rekapitulasi target harian disiarkan otomatis ke grup ini setiap pukul 08:00 WIB.\n\n` +
     `🌐 *Tautan Aplikasi:* https://planspk.com\n\n` +
