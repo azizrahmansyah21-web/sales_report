@@ -6,13 +6,12 @@ import AdminDashboardLayout from "@/components/templates/AdminDashboardLayout";
 import Avatar from "@/components/atoms/Avatar";
 import Badge, { type BadgeVariant } from "@/components/atoms/Badge";
 import SignOutButton from "./SignOutButton";
+import { isSuperAdmin } from "@/lib/auth/roleRoutes";
 import {
-  User,
   ShieldCheck,
   Building2,
   Phone,
   Mail,
-  Calendar,
   FileSpreadsheet,
   Award,
   Users2,
@@ -58,19 +57,19 @@ export default async function AdminProfilePage() {
       prisma.user.count({ where: { role: "SALES", isActive: true } }),
     ]);
 
-  const roleLabel =
-    user.role === "SUPERADMIN"
-      ? "Superadmin Sistem"
-      : user.role === "SPV"
-      ? "Supervisor Sales"
-      : "Administrasi Cabang";
+  const isSuper = isSuperAdmin(user.role);
 
-  const roleBadgeVariant: BadgeVariant =
-    user.role === "SUPERADMIN"
-      ? "LOST"
-      : user.role === "SPV"
-      ? "FOLLOW_UP"
-      : "DEAL";
+  const roleLabel = isSuper
+    ? "Superadmin Sistem"
+    : user.role === "SPV"
+    ? "Supervisor Sales"
+    : "Administrasi Cabang";
+
+  const roleBadgeVariant: BadgeVariant = isSuper
+    ? "LOST"
+    : user.role === "SPV"
+    ? "FOLLOW_UP"
+    : "DEAL";
 
   return (
     <AdminDashboardLayout
@@ -115,7 +114,7 @@ export default async function AdminProfilePage() {
                 {user.role}
               </p>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                {user.role === "SUPERADMIN"
+                {isSuper
                   ? "Akses Penuh Server & Fitur"
                   : user.role === "SPV"
                   ? "Evaluasi & Catatan SPV"

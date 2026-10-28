@@ -14,6 +14,7 @@
     "db:index": "tsx scripts/add-lower-index.ts",
     "user:add-tiwi": "node scripts/add-admin-tiwi.cjs",
     "user:add-asisten-bm": "node scripts/add-asisten-bm.cjs",
+    "user:add-superadmin": "node scripts/add-superadmin.cjs",
     "postinstall": "prisma generate",
     "wa:setup": "tsx scripts/wa-daemon/preprod/setup-qr.ts",
     "wa:find-groups": "tsx scripts/wa-daemon/preprod/find-groups.ts",

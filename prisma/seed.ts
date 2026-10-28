@@ -1,10 +1,20 @@
-import { PrismaClient, Role, SpkStatus } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 // Data Resmi 23 Karyawan & Pimpinan Cabang 220 — Agung Toyota UjungBatu
 // Bersumber langsung dari DATA SALESMAN TO AZIS.xlsx & Struktur Pimpinan Cabang
 const OFFICIAL_PERSONNEL = [
+  // ─── 00. SUPERADMIN (LEAD ARCHITECT & SISTEM KONTROL PUSAT) ───────────────
+  {
+    nip: "999999A220",
+    name: "AZIZ RAHMANSYAH",
+    username: "superadmin",
+    title: "Lead Architect & Superadmin",
+    role: Role.SUPERADMIN,
+    email: "aziz@planspk.com",
+    phone: "081268000999",
+  },
   // ─── 0. BRANCH MANAGER (PIMPINAN TERTINGGI CABANG 220) ────────────────────
   {
     nip: "010101A220",
