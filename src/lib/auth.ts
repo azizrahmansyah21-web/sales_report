@@ -80,6 +80,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
 
+        // Shortcut Asisten BM: "indra", "asistenbm", "asisten bm"
+        if (
+          normalized === "indra" ||
+          normalized === "asistenbm" ||
+          normalized === "asisten bm" ||
+          normalized === "asisten branch manager"
+        ) {
+          const indraUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { username: "indra" },
+                { nip: "154090A319" },
+                { name: { contains: "indra", mode: "insensitive" } },
+              ],
+              role: "ADMIN",
+              isActive: true,
+            },
+          });
+          if (indraUser) {
+            return {
+              id: indraUser.id,
+              name: indraUser.name,
+              email: indraUser.email,
+              username: indraUser.username,
+              role: indraUser.role,
+              title: indraUser.title,
+            };
+          }
+        }
+
         // 1. Khusus Bapak Administration Head: login cepat dengan "ADH"
         if (normalized === "adh" || normalized === "admin head") {
           const adhUser = await prisma.user.findFirst({

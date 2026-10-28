@@ -15,6 +15,15 @@ const OFFICIAL_PERSONNEL = [
     email: "branchmanager@atujungbatu.com",
     phone: "081268000100",
   },
+  {
+    nip: "154090A319",
+    name: "INDRA",
+    username: "indra",
+    title: "Asisten Branch Manager",
+    role: Role.ADMIN,
+    email: "indra@atujungbatu.com",
+    phone: "081268000108",
+  },
   // ─── 1. ADMINISTRATION HEAD ───────────────────────────────────────────────
   {
     nip: "050507A403",
