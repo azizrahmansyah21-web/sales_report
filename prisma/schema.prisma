@@ -13,9 +13,10 @@ datasource db {
 // ─── ENUMS ────────────────────────────────────────────────────────────────
 
 enum Role {
-  ADMIN  // Kelola sistem & isi keterangan
-  SPV    // Supervisor — approve/reject SPK
-  SALES  // Input plan SPK H-1
+  ADMIN       // Kelola sistem & isi keterangan
+  SPV         // Supervisor — approve/reject SPK
+  SALES       // Input plan SPK H-1
+  SUPERADMIN  // Superadmin — kontrol penuh sistem & server
 }
 
 enum SpkStatus {

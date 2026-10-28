@@ -3,12 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import ToyotaLogo from "@/components/atoms/ToyotaLogo";
 import {
   FileSpreadsheet,
   Users2,
+  User,
   Settings,
   LogOut,
   ChevronRight,
@@ -24,6 +25,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   salesCount = 8,
 }) => {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRole = session?.user?.role?.toUpperCase();
+  const isSuperAdmin = userRole === "SUPERADMIN";
 
   const navItems = [
     {
@@ -40,10 +44,19 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       count: `${salesCount} Sales`,
     },
     {
-      href: "/admin/settings",
-      label: "Pengaturan Sistem",
-      icon: <Settings className="w-5 h-5" />,
+      href: "/admin/profile",
+      label: "Profil Saya",
+      icon: <User className="w-5 h-5" />,
     },
+    ...(isSuperAdmin
+      ? [
+          {
+            href: "/admin/settings",
+            label: "Pengaturan Sistem",
+            icon: <Settings className="w-5 h-5" />,
+          },
+        ]
+      : []),
   ];
 
   return (

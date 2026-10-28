@@ -16,16 +16,18 @@ export const ROLE_ROUTES = {
   SPV: "/admin/prospects",
   /** Rute utama Administration Head cabang */
   ADH: "/admin/prospects",
+  /** Rute utama Superadmin Control Center */
+  SUPERADMIN: "/admin/prospects",
   /** Rute login publik */
   LOGIN: "/login",
 } as const;
 
-export type AppRole = "ADMIN" | "SPV" | "SALES" | "ADH";
+export type AppRole = "ADMIN" | "SPV" | "SALES" | "ADH" | "SUPERADMIN";
 
 /**
  * Mengembalikan path default rute aplikasi berdasarkan peran pengguna yang terautentikasi.
  *
- * @param role - String peran dari token sesi (ADMIN, SPV, SALES, atau ADH)
+ * @param role - String peran dari token sesi (ADMIN, SPV, SALES, ADH, atau SUPERADMIN)
  * @returns Path URL tujuan utama (misal: /input atau /admin/prospects)
  */
 export function getDefaultRouteForRole(role?: string | null): string {
@@ -35,7 +37,12 @@ export function getDefaultRouteForRole(role?: string | null): string {
   if (normalized === "SALES") {
     return ROLE_ROUTES.SALES;
   }
-  if (normalized === "ADMIN" || normalized === "SPV" || normalized === "ADH") {
+  if (
+    normalized === "ADMIN" ||
+    normalized === "SPV" ||
+    normalized === "ADH" ||
+    normalized === "SUPERADMIN"
+  ) {
     return ROLE_ROUTES.ADMIN;
   }
 
@@ -44,28 +51,37 @@ export function getDefaultRouteForRole(role?: string | null): string {
 
 /**
  * Memeriksa apakah suatu peran memiliki wewenang untuk mengelola realisasi SPK
- * dan mengisi catatan evaluasi operasional (ADMIN, ADH, dan SPV).
+ * dan mengisi catatan evaluasi operasional (ADMIN, ADH, SPV, dan SUPERADMIN).
  *
  * @param role - String peran pengguna
- * @returns true jika peran berwenang (ADMIN, ADH, atau SPV)
+ * @returns true jika peran berwenang
  */
 export function canManageRealization(role?: string | null): boolean {
   if (!role) return false;
   const normalized = role.toUpperCase();
-  return normalized === "ADMIN" || normalized === "SPV" || normalized === "ADH";
+  return (
+    normalized === "ADMIN" ||
+    normalized === "SPV" ||
+    normalized === "ADH" ||
+    normalized === "SUPERADMIN"
+  );
 }
 
 /**
  * Memeriksa apakah pengguna memiliki hak otorisasi untuk mengubah status closing SPK.
- * Khusus dibatasi hanya untuk ADMIN dan ADH. SPV dilarang mengubah status demi kepatuhan audit.
+ * Khusus dibatasi untuk ADMIN, ADH, dan SUPERADMIN. SPV dilarang mengubah status demi kepatuhan audit.
  *
  * @param role - String peran pengguna
- * @returns true jika peran ADMIN atau ADH
+ * @returns true jika peran ADMIN, ADH, atau SUPERADMIN
  */
 export function canChangeSpkStatus(role?: string | null): boolean {
   if (!role) return false;
   const normalized = role.toUpperCase();
-  return normalized === "ADMIN" || normalized === "ADH";
+  return (
+    normalized === "ADMIN" ||
+    normalized === "ADH" ||
+    normalized === "SUPERADMIN"
+  );
 }
 
 /**
@@ -77,4 +93,15 @@ export function canChangeSpkStatus(role?: string | null): boolean {
 export function canAccessAdminArea(role?: string | null): boolean {
   if (!role) return false;
   return role.toUpperCase() !== "SALES";
+}
+
+/**
+ * Memeriksa apakah pengguna memiliki hak akses penuh Superadmin Control Center.
+ *
+ * @param role - String peran pengguna
+ * @returns true jika peran SUPERADMIN
+ */
+export function isSuperAdmin(role?: string | null): boolean {
+  if (!role) return false;
+  return role.toUpperCase() === "SUPERADMIN";
 }
