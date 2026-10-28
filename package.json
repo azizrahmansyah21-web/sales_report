@@ -12,6 +12,7 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "db:index": "tsx scripts/add-lower-index.ts",
+    "user:add-bm": "node scripts/add-bm-user.cjs",
     "user:add-tiwi": "node scripts/add-admin-tiwi.cjs",
     "user:add-asisten-bm": "node scripts/add-asisten-bm.cjs",
     "user:add-superadmin": "node scripts/add-superadmin.cjs",

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import DatabaseSettingsClient from "./DatabaseSettingsClient";
 import UserSettingsClient from "./UserSettingsClient";
+import WhatsAppSettingsClient from "./WhatsAppSettingsClient";
 import type { DatabaseHealthStats } from "@/lib/actions/databaseAdmin";
 import {
   Database,
@@ -38,44 +39,44 @@ export default function SettingsTabsClient({
     icon: React.ReactNode;
     badge?: string;
   }> = [
-    {
-      id: "DATABASE",
-      label: "1. Management Database",
-      sublabel: "Pembersihan & Truncate",
-      icon: <Database className="w-4 h-4" />,
-      badge: initialDbStats.mockProspectsCount > 0 ? `${initialDbStats.mockProspectsCount} Mock` : undefined,
-    },
-    {
-      id: "USERS",
-      label: "2. Management USER",
-      sublabel: "CRUD & Saklar Aktif",
-      icon: <Users2 className="w-4 h-4" />,
-    },
-    {
-      id: "WHATSAPP",
-      label: "3. Management WA Blast",
-      sublabel: "Daemon & Broadcast",
-      icon: <MessageCircle className="w-4 h-4" />,
-    },
-    {
-      id: "BACKUP",
-      label: "4. Backup Database",
-      sublabel: "Dump .sql.gz Instan",
-      icon: <HardDriveDownload className="w-4 h-4" />,
-    },
-    {
-      id: "ROLES",
-      label: "5. Management Role",
-      sublabel: "RBAC & Perizinan",
-      icon: <ShieldCheck className="w-4 h-4" />,
-    },
-    {
-      id: "PROSPECTS",
-      label: "6. Management Prospect",
-      sublabel: "Sensitivitas & Cutoff",
-      icon: <Sliders className="w-4 h-4" />,
-    },
-  ];
+      {
+        id: "DATABASE",
+        label: "1. Management Database",
+        sublabel: "Pembersihan & Truncate",
+        icon: <Database className="w-4 h-4" />,
+        badge: initialDbStats.mockProspectsCount > 0 ? `${initialDbStats.mockProspectsCount} Mock` : undefined,
+      },
+      {
+        id: "USERS",
+        label: "2. Management USER",
+        sublabel: "CRUD & Saklar Aktif",
+        icon: <Users2 className="w-4 h-4" />,
+      },
+      {
+        id: "WHATSAPP",
+        label: "3. Management WA Blast",
+        sublabel: "Daemon & Broadcast",
+        icon: <MessageCircle className="w-4 h-4" />,
+      },
+      {
+        id: "BACKUP",
+        label: "4. Backup Database",
+        sublabel: "Dump .sql.gz Instan",
+        icon: <HardDriveDownload className="w-4 h-4" />,
+      },
+      {
+        id: "ROLES",
+        label: "5. Management Role",
+        sublabel: "RBAC & Perizinan",
+        icon: <ShieldCheck className="w-4 h-4" />,
+      },
+      {
+        id: "PROSPECTS",
+        label: "6. Management Prospect",
+        sublabel: "Sensitivitas & Cutoff",
+        icon: <Sliders className="w-4 h-4" />,
+      },
+    ];
 
   return (
     <div className="space-y-6">
@@ -89,11 +90,10 @@ export default function SettingsTabsClient({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                }`}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${isActive
+                  ? "bg-blue-600 text-white shadow-xs"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  }`}
               >
                 <span className={isActive ? "text-white" : "text-slate-500"}>
                   {tab.icon}
@@ -101,9 +101,8 @@ export default function SettingsTabsClient({
                 <div className="flex flex-col text-left leading-tight">
                   <span>{tab.label}</span>
                   <span
-                    className={`text-[10px] font-normal ${
-                      isActive ? "text-blue-100" : "text-slate-400"
-                    }`}
+                    className={`text-[10px] font-normal ${isActive ? "text-blue-100" : "text-slate-400"
+                      }`}
                   >
                     {tab.sublabel}
                   </span>
@@ -129,21 +128,7 @@ export default function SettingsTabsClient({
       )}
 
       {activeTab === "WHATSAPP" && (
-        <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto">
-            <MessageCircle className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Modul 3: Management WA Blast ke Grup
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Monitoring koneksi Baileys daemon, tombol test ping ke grup cabang, master broadcast toggle, dan log riwayat pengiriman notifikasi.
-          </p>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            Siap dibangun pada tahap berikutnya
-          </span>
-        </div>
+        <WhatsAppSettingsClient />
       )}
 
       {activeTab === "BACKUP" && (
