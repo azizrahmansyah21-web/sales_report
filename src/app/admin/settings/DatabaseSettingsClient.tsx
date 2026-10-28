@@ -1,26 +1,30 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useCallback } from "react";
 import Button from "@/components/atoms/Button";
 import Input from "@/components/atoms/Input";
 import FormField from "@/components/molecules/FormField";
 import {
   DatabaseHealthStats,
-  cleanMockProspectsAction,
+  TableName,
+  TableDataResult,
+  getTableRowsAction,
+  deleteSelectedRowsAction,
   truncatePlanSpkAction,
-  selectiveDeleteProspectsAction,
 } from "@/lib/actions/databaseAdmin";
 import {
+  FileSpreadsheet,
+  Users2,
   Trash2,
   AlertTriangle,
   CheckCircle2,
-  ShieldAlert,
-  FileSpreadsheet,
-  Users2,
-  HardDrive,
   Search,
   Lock,
   X,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 
 interface DatabaseSettingsClientProps {
@@ -31,48 +35,147 @@ export default function DatabaseSettingsClient({
   initialStats,
 }: DatabaseSettingsClientProps) {
   const [stats, setStats] = useState<DatabaseHealthStats>(initialStats);
+  const [activeTable, setActiveTable] = useState<TableName>("plan_spk");
   const [isPending, startTransition] = useTransition();
 
-  // Feedback banner state
+  // Table Data & Pagination State
+  const [tableData, setTableData] = useState<TableDataResult | null>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 15;
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isLoadingRows, setIsLoadingRows] = useState(true);
+
+  // Selected Row IDs for Multi-Delete
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Banner Feedback
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // Modal 1: Clean Mock Modal
-  const [isMockModalOpen, setIsMockModalOpen] = useState(false);
-  const [mockConfirmText, setMockConfirmText] = useState("");
+  // Modal 1: Delete Selected Modal
+  const [isDeleteSelectedModalOpen, setIsDeleteSelectedModalOpen] = useState(false);
 
   // Modal 2: Truncate Modal (Danger Zone)
   const [isTruncateModalOpen, setIsTruncateModalOpen] = useState(false);
   const [truncateConfirmText, setTruncateConfirmText] = useState("");
   const [truncatePassword, setTruncatePassword] = useState("");
 
-  // Selective search keyword
-  const [selectiveKeyword, setSelectiveKeyword] = useState("");
-
-  // Handler: Clean Mock Data
-  const handleCleanMock = () => {
-    if (mockConfirmText.trim() !== "BERSIHKAN DATA MOCK") {
-      setFeedback({
-        type: "error",
-        message: 'Teks konfirmasi harus persis: "BERSIHKAN DATA MOCK"',
+  // Fetch Table Rows
+  const loadTableData = useCallback(
+    async (targetTable: TableName, targetPage: number, search: string) => {
+      const res = await getTableRowsAction({
+        tableName: targetTable,
+        page: targetPage,
+        pageSize,
+        search,
       });
-      return;
+
+      if (res.success) {
+        if (res.data) setTableData(res.data);
+      } else {
+        setFeedback({
+          type: "error",
+          message: res.error || "Gagal memuat data tabel.",
+        });
+      }
+      setIsLoadingRows(false);
+      setSelectedIds([]);
+    },
+    [pageSize]
+  );
+
+  // Load rows when activeTable, page, or search changes
+  useEffect(() => {
+    let ignore = false;
+    getTableRowsAction({
+      tableName: activeTable,
+      page,
+      pageSize,
+      search: searchTerm,
+    }).then((res) => {
+      if (ignore) return;
+      if (res.success) {
+        if (res.data) setTableData(res.data);
+      } else {
+        setFeedback({
+          type: "error",
+          message: res.error || "Gagal memuat data tabel.",
+        });
+      }
+      setIsLoadingRows(false);
+      setSelectedIds([]);
+    });
+
+    return () => {
+      ignore = true;
+    };
+  }, [activeTable, page, searchTerm, pageSize]);
+
+  // Handle Search Input
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoadingRows(true);
+    setPage(1);
+    loadTableData(activeTable, 1, searchTerm);
+  };
+
+  // Switch Active Table Tab
+  const handleSwitchTable = (table: TableName) => {
+    setIsLoadingRows(true);
+    setActiveTable(table);
+    setPage(1);
+    setSearchTerm("");
+    setSelectedIds([]);
+  };
+
+  // Toggle single row selection
+  const handleToggleRow = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Toggle select all on current page
+  const handleToggleSelectAll = () => {
+    if (!tableData) return;
+    const selectableIds = tableData.rows.map((r) => r.id);
+    const isAllSelected = selectableIds.every((id) => selectedIds.includes(id));
+
+    if (isAllSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(selectableIds);
     }
+  };
+
+  // Execute Delete Selected Rows
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
 
     startTransition(async () => {
-      const res = await cleanMockProspectsAction(mockConfirmText);
+      const res = await deleteSelectedRowsAction({
+        tableName: activeTable,
+        ids: selectedIds,
+      });
+
       if (res.success) {
         setFeedback({ type: "success", message: res.message });
-        setIsMockModalOpen(false);
-        setMockConfirmText("");
-        // Update local stats
+        setIsDeleteSelectedModalOpen(false);
+        // Reload data
+        loadTableData(activeTable, page, searchTerm);
+        // Update total stats
         setStats((prev) => ({
           ...prev,
-          totalProspects: Math.max(0, prev.totalProspects - (res.data?.deletedCount || 0)),
-          mockProspectsCount: 0,
-          mockProspectsList: [],
+          totalProspects:
+            activeTable === "plan_spk"
+              ? Math.max(0, prev.totalProspects - selectedIds.length)
+              : prev.totalProspects,
+          totalUsers:
+            activeTable === "users"
+              ? Math.max(0, prev.totalUsers - selectedIds.length)
+              : prev.totalUsers,
         }));
       } else {
         setFeedback({ type: "error", message: res.error });
@@ -80,7 +183,7 @@ export default function DatabaseSettingsClient({
     });
   };
 
-  // Handler: Truncate All Prospects
+  // Execute Truncate Table
   const handleTruncate = () => {
     if (truncateConfirmText.trim() !== "HAPUS SEMUA DATA PROSPEK") {
       setFeedback({
@@ -105,14 +208,13 @@ export default function DatabaseSettingsClient({
         setIsTruncateModalOpen(false);
         setTruncateConfirmText("");
         setTruncatePassword("");
-        // Reset local stats
+        loadTableData("plan_spk", 1, "");
         setStats((prev) => ({
           ...prev,
           totalProspects: 0,
           totalDuplicates: 0,
           mockProspectsCount: 0,
           mockProspectsList: [],
-          byStatus: { PENDING: 0, BERHASIL: 0, BELUM_BERHASIL: 0 },
         }));
       } else {
         setFeedback({ type: "error", message: res.error });
@@ -120,43 +222,14 @@ export default function DatabaseSettingsClient({
     });
   };
 
-  // Handler: Selective Delete
-  const handleSelectiveDelete = () => {
-    if (!selectiveKeyword.trim() || selectiveKeyword.trim().length < 2) {
-      setFeedback({
-        type: "error",
-        message: "Masukkan kata kunci pencarian minimal 2 karakter.",
-      });
-      return;
-    }
-
-    if (
-      !confirm(
-        `Apakah Anda yakin ingin menghapus seluruh data yang mengandung kata kunci "${selectiveKeyword}"?`
-      )
-    ) {
-      return;
-    }
-
-    startTransition(async () => {
-      const res = await selectiveDeleteProspectsAction(selectiveKeyword);
-      if (res.success) {
-        setFeedback({ type: "success", message: res.message });
-        setSelectiveKeyword("");
-        // Decrement local stats
-        setStats((prev) => ({
-          ...prev,
-          totalProspects: Math.max(0, prev.totalProspects - (res.data?.deletedCount || 0)),
-        }));
-      } else {
-        setFeedback({ type: "error", message: res.error });
-      }
-    });
-  };
+  const isCurrentPageAllSelected =
+    tableData &&
+    tableData.rows.length > 0 &&
+    tableData.rows.every((r) => selectedIds.includes(r.id));
 
   return (
     <div className="space-y-6">
-      {/* Alert Banner Feedback */}
+      {/* Feedback Banner */}
       {feedback && (
         <div
           className={`p-4 rounded-2xl border flex items-start justify-between shadow-2xs animate-in fade-in ${
@@ -185,225 +258,366 @@ export default function DatabaseSettingsClient({
         </div>
       )}
 
-      {/* Grid 4 Kartu Metrik Kesehatan Database */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Prospects */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold">Tabel `plan_spk`</span>
-            <FileSpreadsheet className="w-4 h-4 text-blue-600" />
-          </div>
-          <p className="text-2xl lg:text-3xl font-black text-slate-900 mt-2">
+      {/* Database Health Summary Pills */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            Total Prospek
+          </span>
+          <p className="text-xl font-black text-slate-900 mt-1">
             {stats.totalProspects}
           </p>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-            <span>{stats.byStatus.BERHASIL} Closing</span>
-            <span className="text-slate-300">•</span>
-            <span>{stats.byStatus.PENDING} Menunggu</span>
-          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+            tabel plan_spk
+          </p>
         </div>
 
-        {/* Total Users */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold">Tabel `users`</span>
-            <Users2 className="w-4 h-4 text-purple-600" />
-          </div>
-          <p className="text-2xl lg:text-3xl font-black text-slate-900 mt-2">
+        <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            Total Personel
+          </span>
+          <p className="text-xl font-black text-slate-900 mt-1">
             {stats.totalUsers}
           </p>
-          <p className="text-[11px] text-purple-600 mt-2 font-medium">
-            {stats.totalActiveSales} Sales Lapangan Aktif
+          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+            tabel users
           </p>
         </div>
 
-        {/* Mock Prospects Status */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold">Data Uji Coba (Mock)</span>
-            <AlertTriangle
-              className={`w-4 h-4 ${
-                stats.mockProspectsCount > 0 ? "text-amber-500" : "text-emerald-500"
-              }`}
-            />
-          </div>
+        <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            Data Mock
+          </span>
           <p
-            className={`text-2xl lg:text-3xl font-black mt-2 ${
+            className={`text-xl font-black mt-1 ${
               stats.mockProspectsCount > 0 ? "text-amber-600" : "text-slate-900"
             }`}
           >
             {stats.mockProspectsCount}
           </p>
-          <p className="text-[11px] text-slate-500 mt-2 font-medium">
-            {stats.mockProspectsCount > 0
-              ? "Perlu dibersihkan"
-              : "Database 100% Bersih"}
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {stats.mockProspectsCount > 0 ? "Perlu dibersihkan" : "Bersih 100%"}
           </p>
         </div>
 
-        {/* PostgreSQL Storage & Connection */}
-        <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold">Database Storage</span>
-            <HardDrive className="w-4 h-4 text-emerald-600" />
-          </div>
-          <p className="text-2xl lg:text-3xl font-black text-slate-900 mt-2 font-mono">
+        <div className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            Database Size
+          </span>
+          <p className="text-xl font-black text-slate-900 mt-1 font-mono">
             {stats.estimatedDbSize}
           </p>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-700 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Connection Pool: Aktif</span>
+          <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>PostgreSQL Online</span>
           </div>
         </div>
       </div>
 
-      {/* Panel 1: Pembersihan Data Uji Coba (Mock Data Hygiene) */}
-      <div className="p-6 md:p-7 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-          <div>
+      {/* Table Explorer */}
+      <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        {/* Table Selector & Top Action Toolbar */}
+        <div className="p-4 md:p-5 border-b border-slate-200 bg-slate-50/70 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Table Tabs Selector */}
             <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-600" />
-              <h2 className="text-base font-bold text-slate-900">
-                Pembersihan Data Uji Coba & Mockup
-              </h2>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider mr-1">
+                Tabel:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSwitchTable("plan_spk")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTable === "plan_spk"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>plan_spk</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeTable === "plan_spk"
+                      ? "bg-blue-700 text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {stats.totalProspects}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSwitchTable("users")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  activeTable === "users"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                <Users2 className="w-4 h-4" />
+                <span>users</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    activeTable === "users"
+                      ? "bg-blue-700 text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {stats.totalUsers}
+                </span>
+              </button>
             </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Menghapus entri yang mengandung label [mock up], data contoh, atau data latihan tanpa mengganggu prospek nasabah asli.
-            </p>
+
+            {/* Truncate Plan SPK Button (Only active when plan_spk is selected) */}
+            {activeTable === "plan_spk" && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setIsTruncateModalOpen(true)}
+                disabled={stats.totalProspects === 0 || isPending}
+                leftIcon={<Trash2 className="w-4 h-4" />}
+              >
+                Truncate Tabel
+              </Button>
+            )}
           </div>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsMockModalOpen(true)}
-            disabled={stats.mockProspectsCount === 0 || isPending}
-            leftIcon={<Trash2 className="w-4 h-4 text-amber-600" />}
-          >
-            Bersihkan Data Mock ({stats.mockProspectsCount})
-          </Button>
+          {/* Search & Refresh Toolbar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+            <form onSubmit={handleSearch} className="flex items-center gap-2 w-full sm:max-w-md">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={`Cari di tabel ${activeTable}...`}
+                  className="w-full h-9 pl-9 pr-3 rounded-xl bg-white border border-slate-200 text-xs focus:border-blue-600 outline-none font-medium"
+                />
+              </div>
+              <Button type="submit" variant="secondary" size="sm">
+                Cari
+              </Button>
+            </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoadingRows(true);
+                loadTableData(activeTable, page, searchTerm);
+              }}
+              disabled={isLoadingRows}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer self-end sm:self-auto"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isLoadingRows ? "animate-spin" : ""}`} />
+              <span>Refresh Data</span>
+            </button>
+          </div>
         </div>
 
-        {stats.mockProspectsCount > 0 ? (
-          <div className="space-y-2">
-            <p className="text-xs font-bold text-slate-700">
-              Daftar Data Mock Terdeteksi (Maks 10 terakhir):
-            </p>
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                  <tr>
-                    <th className="p-3">Nama Customer</th>
-                    <th className="p-3">Unit</th>
-                    <th className="p-3">Catatan Admin</th>
-                    <th className="p-3">Sales</th>
-                    <th className="p-3">Tanggal</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {stats.mockProspectsList.map((m) => (
-                    <tr key={m.id} className="hover:bg-amber-50/40">
-                      <td className="p-3 font-semibold text-slate-900">
-                        {m.customerName}
-                      </td>
-                      <td className="p-3 text-slate-600">{m.unitName}</td>
-                      <td className="p-3 text-amber-700 font-medium">
-                        {m.keteranganAdmin || "-"}
-                      </td>
-                      <td className="p-3 text-slate-600">{m.salesName}</td>
-                      <td className="p-3 text-slate-400 font-mono text-[11px]">
-                        {new Date(m.createdAt).toLocaleDateString("id-ID")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        {/* Floating selection bar */}
+        {selectedIds.length > 0 && (
+          <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+              <ShieldCheck className="w-4 h-4 text-amber-700" />
+              <span>{selectedIds.length} baris data dipilih</span>
             </div>
-          </div>
-        ) : (
-          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-            <p className="text-xs text-emerald-800 font-medium">
-              Basis data bersih dari data tiruan / mock up. Seluruh record prospek yang tersimpan saat ini adalah data operasional riil.
-            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="px-2.5 py-1 text-xs font-semibold text-slate-600 hover:text-slate-900"
+              >
+                Batal Pilih
+              </button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => setIsDeleteSelectedModalOpen(true)}
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+              >
+                Hapus ({selectedIds.length}) Baris
+              </Button>
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Panel 2: Penghapusan Selektif Berdasarkan Kata Kunci */}
-      <div className="p-6 md:p-7 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4">
-        <div className="flex items-center gap-2">
-          <Search className="w-5 h-5 text-blue-600" />
-          <h2 className="text-base font-bold text-slate-900">
-            Penghapusan Selektif Berdasarkan Kata Kunci
-          </h2>
+        {/* Table data grid */}
+        <div className="overflow-x-auto min-h-[300px]">
+          <table className="w-full text-xs text-left">
+            <thead className="bg-slate-100/90 text-slate-700 font-bold border-b border-slate-200 sticky top-0 select-none">
+              <tr>
+                <th className="p-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={!!isCurrentPageAllSelected}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                    aria-label="Pilih semua baris di halaman ini"
+                  />
+                </th>
+                <th className="p-3 font-mono text-[11px] text-slate-500">#</th>
+                {tableData?.columns.map((col) => (
+                  <th key={col} className="p-3 uppercase tracking-wider font-semibold">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-100">
+              {isLoadingRows ? (
+                <tr>
+                  <td
+                    colSpan={(tableData?.columns.length || 8) + 2}
+                    className="p-12 text-center text-slate-400"
+                  >
+                    <RotateCw className="w-6 h-6 animate-spin mx-auto text-blue-600 mb-2" />
+                    <p className="text-xs font-medium">Memuat data dari database...</p>
+                  </td>
+                </tr>
+              ) : tableData && tableData.rows.length > 0 ? (
+                tableData.rows.map((row, index) => {
+                  const isChecked = selectedIds.includes(row.id);
+                  const isMock =
+                    String(row.keteranganAdmin || "").toLowerCase().includes("mock") ||
+                    String(row.customerName || "").toLowerCase().includes("contoh");
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`transition-colors ${
+                        isChecked
+                          ? "bg-amber-50/70"
+                          : isMock
+                          ? "bg-amber-50/30 hover:bg-amber-50/50"
+                          : "hover:bg-slate-50/80"
+                      }`}
+                    >
+                      <td className="p-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer"
+                        />
+                      </td>
+                      <td className="p-3 font-mono text-slate-400 text-[10px]">
+                        {(page - 1) * pageSize + index + 1}
+                      </td>
+                      {tableData.columns.map((col) => {
+                        const val = String(row[col] ?? "-");
+                        const isStatusCol = col === "spkStatus";
+                        const isDuplicateCol = col === "isDuplicate";
+
+                        return (
+                          <td key={col} className="p-3 font-medium text-slate-800">
+                            {isStatusCol ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  val === "BERHASIL"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : val === "BELUM_BERHASIL"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : "bg-blue-100 text-blue-800"
+                                }`}
+                              >
+                                {val}
+                              </span>
+                            ) : isDuplicateCol ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                                  val === "YA"
+                                    ? "bg-amber-200 text-amber-900 font-bold"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {val}
+                              </span>
+                            ) : (
+                              <span className="truncate max-w-[200px] inline-block">
+                                {val}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td
+                    colSpan={(tableData?.columns.length || 8) + 2}
+                    className="p-12 text-center text-slate-400"
+                  >
+                    <p className="text-xs font-semibold text-slate-600">
+                      Tidak ada data ditemukan di tabel {activeTable}.
+                    </p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-        <p className="text-xs text-slate-500">
-          Cari dan hapus entri prospek tertentu berdasarkan kata kunci nama pelanggan atau catatan admin (misal: &quot;latihan&quot;, &quot;test123&quot;).
-        </p>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 max-w-xl">
-          <Input
-            value={selectiveKeyword}
-            onChange={(e) => setSelectiveKeyword(e.target.value)}
-            placeholder="Ketik kata kunci yang ingin dihapus..."
-            className="flex-1"
-            disabled={isPending}
-          />
-          <Button
-            variant="secondary"
-            onClick={handleSelectiveDelete}
-            disabled={!selectiveKeyword.trim() || isPending}
-            isLoading={isPending}
-            leftIcon={<Trash2 className="w-4 h-4 text-rose-600" />}
-          >
-            Hapus Data Terpilih
-          </Button>
-        </div>
-      </div>
-
-      {/* Panel 3: Danger Zone (TRUNCATE plan_spk) */}
-      <div className="p-6 md:p-7 rounded-3xl bg-rose-50/60 border border-rose-200/90 shadow-2xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-rose-700">
-              <AlertTriangle className="w-5 h-5" />
-              <h2 className="text-base font-bold">
-                Zona Bahaya: Reset Total Data Prospek (`TRUNCATE plan_spk`)
-              </h2>
-            </div>
-            <p className="text-xs text-rose-900 leading-relaxed max-w-2xl">
-              Tindakan ini akan <strong>mengosongkan seluruh baris tabel prospek ({stats.totalProspects} data)</strong> secara permanen. 
-              Gunakan hanya saat reset pergantian tahun/siklus atau pembersihan total pasca-training. Akun karyawan, admin, dan pimpinan tetap aman 100%.
-            </p>
+        {/* Pagination bar */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+          <div>
+            Menampilkan{" "}
+            <span className="font-bold text-slate-800">
+              {tableData && tableData.rows.length > 0 ? (page - 1) * pageSize + 1 : 0}
+            </span>{" "}
+            -{" "}
+            <span className="font-bold text-slate-800">
+              {tableData ? Math.min(page * pageSize, tableData.total) : 0}
+            </span>{" "}
+            dari <span className="font-bold text-slate-800">{tableData?.total || 0}</span> data
           </div>
 
-          <Button
-            variant="danger"
-            size="md"
-            onClick={() => setIsTruncateModalOpen(true)}
-            disabled={stats.totalProspects === 0 || isPending}
-            leftIcon={<Trash2 className="w-4 h-4" />}
-          >
-            Kosongkan Seluruh Prospek
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || isLoadingRows}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Sebelumnya</span>
+            </button>
+
+            <span className="px-2 py-1 font-mono font-bold text-slate-700">
+              Halaman {page} dari {tableData?.totalPages || 1}
+            </span>
+
+            <button
+              type="button"
+              disabled={!tableData || page >= tableData.totalPages || isLoadingRows}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"
+            >
+              <span>Selanjutnya</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ─── MODAL 1: KONFIRMASI BERSIHKAN DATA MOCK ──────────────────────── */}
-      {isMockModalOpen && (
+      {/* Modal: Delete selected rows */}
+      {isDeleteSelectedModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2 text-amber-600">
+              <div className="flex items-center gap-2 text-rose-600">
                 <AlertTriangle className="w-5 h-5" />
                 <h3 className="text-base font-bold text-slate-900">
-                  Konfirmasi Pembersihan Data Mock
+                  Hapus {selectedIds.length} Baris Data?
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setIsMockModalOpen(false)}
+                onClick={() => setIsDeleteSelectedModalOpen(false)}
                 className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
               >
                 <X className="w-4 h-4" />
@@ -411,24 +625,18 @@ export default function DatabaseSettingsClient({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Sebanyak <strong>{stats.mockProspectsCount} data prospek mock up</strong> akan dihapus permanen dari basis data.
+              Anda akan menghapus <strong>{selectedIds.length} baris data terpilih</strong> dari tabel{" "}
+              <code className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-800 font-mono">
+                {activeTable}
+              </code>
+              . Tindakan ini tidak dapat dibatalkan.
             </p>
-
-            <FormField label='Ketik: "BERSIHKAN DATA MOCK" untuk konfirmasi' required>
-              <Input
-                value={mockConfirmText}
-                onChange={(e) => setMockConfirmText(e.target.value)}
-                placeholder="BERSIHKAN DATA MOCK"
-                disabled={isPending}
-                autoFocus
-              />
-            </FormField>
 
             <div className="flex items-center gap-3 pt-2">
               <Button
                 variant="secondary"
                 className="flex-1"
-                onClick={() => setIsMockModalOpen(false)}
+                onClick={() => setIsDeleteSelectedModalOpen(false)}
                 disabled={isPending}
               >
                 Batal
@@ -436,18 +644,17 @@ export default function DatabaseSettingsClient({
               <Button
                 variant="danger"
                 className="flex-1"
-                onClick={handleCleanMock}
-                disabled={mockConfirmText.trim() !== "BERSIHKAN DATA MOCK" || isPending}
+                onClick={handleDeleteSelected}
                 isLoading={isPending}
               >
-                Bersihkan Sekarang
+                Ya, Hapus ({selectedIds.length})
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ─── MODAL 2: KONFIRMASI GANDA DANGER ZONE (TRUNCATE) ──────────────── */}
+      {/* Modal: Truncate table */}
       {isTruncateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-rose-300 space-y-5">
@@ -455,7 +662,7 @@ export default function DatabaseSettingsClient({
               <div className="flex items-center gap-2 text-rose-600">
                 <AlertTriangle className="w-5 h-5" />
                 <h3 className="text-base font-bold text-slate-900">
-                  Pengaman Ganda: Reset Seluruh Prospek
+                  Konfirmasi Truncate Tabel `plan_spk`
                 </h3>
               </div>
               <button
@@ -468,14 +675,15 @@ export default function DatabaseSettingsClient({
             </div>
 
             <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-950 text-xs leading-relaxed">
-              <strong>PERINGATAN TINGKAT TINGGI:</strong>
+              <strong>PERINGATAN:</strong>
               <p className="mt-1">
-                Seluruh <strong>{stats.totalProspects} data rencana prospek dan realisasi SPK</strong> akan dikosongkan permanen. Tindakan ini tidak dapat dibatalkan.
+                Seluruh {stats.totalProspects} data pada tabel <code>plan_spk</code> akan dikosongkan.
+                Tabel master <code>users</code> tetap utuh.
               </p>
             </div>
 
             <div className="space-y-4">
-              <FormField label='Langkah 1: Ketik persis: "HAPUS SEMUA DATA PROSPEK"' required>
+              <FormField label='Ketik persis: "HAPUS SEMUA DATA PROSPEK"' required>
                 <Input
                   value={truncateConfirmText}
                   onChange={(e) => setTruncateConfirmText(e.target.value)}
@@ -484,7 +692,7 @@ export default function DatabaseSettingsClient({
                 />
               </FormField>
 
-              <FormField label="Langkah 2: Verifikasi Kata Sandi Superadmin" required>
+              <FormField label="Kata Sandi Superadmin" required>
                 <Input
                   type="password"
                   value={truncatePassword}
@@ -516,7 +724,7 @@ export default function DatabaseSettingsClient({
                 }
                 isLoading={isPending}
               >
-                Saya Mengerti & Kosongkan
+                Kosongkan Tabel
               </Button>
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import DatabaseSettingsClient from "./DatabaseSettingsClient";
+import UserSettingsClient from "./UserSettingsClient";
 import type { DatabaseHealthStats } from "@/lib/actions/databaseAdmin";
 import {
   Database,
@@ -78,7 +79,7 @@ export default function SettingsTabsClient({
 
   return (
     <div className="space-y-6">
-      {/* ─── TAB NAVIGATION BAR (6 MODUL SUPERADMIN) ────────────────────────── */}
+      {/* Navigation tabs */}
       <div className="bg-white p-2 rounded-2xl border border-slate-200/90 shadow-2xs overflow-x-auto no-scrollbar">
         <div className="flex items-center gap-1.5 min-w-max">
           {tabs.map((tab) => {
@@ -118,27 +119,13 @@ export default function SettingsTabsClient({
         </div>
       </div>
 
-      {/* ─── TAB CONTENT DISPLAY ────────────────────────────────────────────── */}
+      {/* Tab content */}
       {activeTab === "DATABASE" && (
         <DatabaseSettingsClient initialStats={initialDbStats} />
       )}
 
       {activeTab === "USERS" && (
-        <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
-            <Users2 className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Modul 2: Management USER
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            CRUD data seluruh karyawan (NIP, Nama, WA), tombol toggle status aktif (<code>isActive</code>), serta reset kredensial sales & admin cabang.
-          </p>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            Siap dibangun pada tahap berikutnya
-          </span>
-        </div>
+        <UserSettingsClient />
       )}
 
       {activeTab === "WHATSAPP" && (

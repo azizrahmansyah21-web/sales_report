@@ -295,3 +295,260 @@ export async function selectiveDeleteProspectsAction(
   }
 }
 
+export type TableName = "plan_spk" | "users";
+
+export type TableRowData = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export type TableDataResult = {
+  rows: TableRowData[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  columns: string[];
+};
+
+/**
+ * Mengambil data baris tabel untuk antarmuka Neon Table Explorer.
+ */
+export async function getTableRowsAction(params: {
+  tableName: TableName;
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}): Promise<DatabaseActionResult<TableDataResult>> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "SUPERADMIN") {
+      return { success: false, error: "Akses ditolak: Hanya Superadmin yang berwenang." };
+    }
+
+    const page = Math.max(1, params.page || 1);
+    const pageSize = Math.max(5, Math.min(50, params.pageSize || 15));
+    const skip = (page - 1) * pageSize;
+    const cleanSearch = params.search?.trim();
+
+    if (params.tableName === "plan_spk") {
+      const whereClause: {
+        OR?: Array<{
+          customerName?: { contains: string; mode: "insensitive" };
+          unitName?: { contains: string; mode: "insensitive" };
+          keteranganAdmin?: { contains: string; mode: "insensitive" };
+        }>;
+      } = {};
+
+      if (cleanSearch) {
+        whereClause.OR = [
+          { customerName: { contains: cleanSearch, mode: "insensitive" } },
+          { unitName: { contains: cleanSearch, mode: "insensitive" } },
+          { keteranganAdmin: { contains: cleanSearch, mode: "insensitive" } },
+        ];
+      }
+
+      const [total, records] = await Promise.all([
+        prisma.planSPK.count({ where: whereClause }),
+        prisma.planSPK.findMany({
+          where: whereClause,
+          include: {
+            sales: { select: { name: true, nip: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: pageSize,
+        }),
+      ]);
+
+      const rows: TableRowData[] = records.map((r) => ({
+        id: r.id,
+        customerName: r.customerName,
+        unitName: r.unitName,
+        salesName: r.sales?.name || "-",
+        planDate: r.planDate.toISOString().split("T")[0],
+        spkStatus: r.spkStatus,
+        isDuplicate: r.isDuplicate ? "YA" : "TIDAK",
+        keteranganAdmin: r.keteranganAdmin || "-",
+        createdAt: r.createdAt.toISOString().replace("T", " ").substring(0, 19),
+      }));
+
+      const columns = [
+        "customerName",
+        "unitName",
+        "salesName",
+        "planDate",
+        "spkStatus",
+        "isDuplicate",
+        "keteranganAdmin",
+        "createdAt",
+      ];
+
+      return {
+        success: true,
+        message: "Data tabel plan_spk berhasil dimuat.",
+        data: {
+          rows,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+          columns,
+        },
+      };
+    }
+
+    if (params.tableName === "users") {
+      const whereClause: {
+        OR?: Array<{
+          name?: { contains: string; mode: "insensitive" };
+          nip?: { contains: string; mode: "insensitive" };
+          username?: { contains: string; mode: "insensitive" };
+        }>;
+      } = {};
+
+      if (cleanSearch) {
+        whereClause.OR = [
+          { name: { contains: cleanSearch, mode: "insensitive" } },
+          { nip: { contains: cleanSearch, mode: "insensitive" } },
+          { username: { contains: cleanSearch, mode: "insensitive" } },
+        ];
+      }
+
+      const [total, records] = await Promise.all([
+        prisma.user.count({ where: whereClause }),
+        prisma.user.findMany({
+          where: whereClause,
+          select: {
+            id: true,
+            name: true,
+            nip: true,
+            username: true,
+            email: true,
+            role: true,
+            title: true,
+            phone: true,
+            isActive: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: pageSize,
+        }),
+      ]);
+
+      const rows: TableRowData[] = records.map((u) => ({
+        id: u.id,
+        name: u.name,
+        nip: u.nip || "-",
+        username: u.username || "-",
+        role: u.role,
+        title: u.title || "-",
+        phone: u.phone || "-",
+        isActive: u.isActive ? "AKTIF" : "NONAKTIF",
+        createdAt: u.createdAt.toISOString().replace("T", " ").substring(0, 19),
+      }));
+
+      const columns = [
+        "name",
+        "nip",
+        "username",
+        "role",
+        "title",
+        "phone",
+        "isActive",
+        "createdAt",
+      ];
+
+      return {
+        success: true,
+        message: "Data tabel users berhasil dimuat.",
+        data: {
+          rows,
+          total,
+          page,
+          pageSize,
+          totalPages: Math.ceil(total / pageSize),
+          columns,
+        },
+      };
+    }
+
+    return { success: false, error: "Tabel tidak dikenal." };
+  } catch (error) {
+    console.error("[getTableRowsAction] Error:", error);
+    return { success: false, error: "Gagal memuat baris data tabel." };
+  }
+}
+
+/**
+ * Menghapus baris-baris terpilih dari tabel database via Neon Table Explorer.
+ */
+export async function deleteSelectedRowsAction(params: {
+  tableName: TableName;
+  ids: string[];
+}): Promise<DatabaseActionResult<{ deletedCount: number }>> {
+  try {
+    const session = await auth();
+    if (session?.user?.role !== "SUPERADMIN" || !session.user.id) {
+      return { success: false, error: "Akses ditolak: Hanya Superadmin yang berwenang." };
+    }
+
+    const { tableName, ids } = params;
+    if (!ids || ids.length === 0) {
+      return { success: false, error: "Pilih minimal 1 baris untuk dihapus." };
+    }
+
+    if (tableName === "users") {
+      // Proteksi akun: Dilarang menghapus akun sendiri
+      if (ids.includes(session.user.id)) {
+        return {
+          success: false,
+          error: "Dilarang menghapus akun Superadmin Anda sendiri demi integritas sistem.",
+        };
+      }
+
+      // Hapus prospek terkait sales terlebih dahulu agar tidak memicu foreign key violation
+      await prisma.$transaction([
+        prisma.planSPK.deleteMany({
+          where: { salesId: { in: ids } },
+        }),
+        prisma.user.deleteMany({
+          where: { id: { in: ids } },
+        }),
+      ]);
+
+      revalidatePath("/admin/settings");
+      revalidatePath("/admin/team");
+      revalidatePath("/admin/profile");
+
+      return {
+        success: true,
+        message: `Berhasil menghapus ${ids.length} akun pengguna dari tabel users.`,
+        data: { deletedCount: ids.length },
+      };
+    }
+
+    if (tableName === "plan_spk") {
+      const deleteResult = await prisma.planSPK.deleteMany({
+        where: { id: { in: ids } },
+      });
+
+      revalidatePath("/admin/settings");
+      revalidatePath("/admin/prospects");
+      revalidatePath("/admin/profile");
+
+      return {
+        success: true,
+        message: `Berhasil menghapus ${deleteResult.count} baris terpilih dari tabel plan_spk.`,
+        data: { deletedCount: deleteResult.count },
+      };
+    }
+
+    return { success: false, error: "Nama tabel tidak valid." };
+  } catch (error) {
+    console.error("[deleteSelectedRowsAction] Error:", error);
+    return { success: false, error: "Gagal menghapus baris terpilih." };
+  }
+}
+
