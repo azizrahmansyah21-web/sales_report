@@ -113,3 +113,18 @@ model WhatsAppMessage {
   @@index([createdAt])
   @@map("whatsapp_messages")
 }
+
+// ─── DATABASE BACKUP ENGINE (MODUL 4) ──────────────────────────────────────
+
+model DatabaseBackupLog {
+  id            String   @id @default(cuid())
+  fileName      String   @map("file_name")
+  fileSizeBytes Int      @map("file_size_bytes")
+  recordsCount  Int      @map("records_count")
+  scope         String   @default("FULL")
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("database_backup_logs")
+}

@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import DatabaseSettingsClient from "./DatabaseSettingsClient";
 import UserSettingsClient from "./UserSettingsClient";
 import WhatsAppSettingsClient from "./WhatsAppSettingsClient";
+import BackupSettingsClient from "./BackupSettingsClient";
+import RoleSettingsClient from "./RoleSettingsClient";
 import type { DatabaseHealthStats } from "@/lib/actions/databaseAdmin";
 import {
   Database,
@@ -132,39 +134,11 @@ export default function SettingsTabsClient({
       )}
 
       {activeTab === "BACKUP" && (
-        <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
-            <HardDriveDownload className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Modul 4: Pengaturan Backup Database
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Streaming download file dump terkompresi <code>.sql.gz</code> langsung ke laptop Superadmin dan riwayat snapshot database.
-          </p>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            Siap dibangun pada tahap berikutnya
-          </span>
-        </div>
+        <BackupSettingsClient />
       )}
 
       {activeTab === "ROLES" && (
-        <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Modul 5: Management Role & RBAC
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Matriks perizinan visual (Permissions Matrix), promosi dan demosi role pengguna secara dinamis.
-          </p>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            Siap dibangun pada tahap berikutnya
-          </span>
-        </div>
+        <RoleSettingsClient />
       )}
 
       {activeTab === "PROSPECTS" && (
