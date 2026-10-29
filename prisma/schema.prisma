@@ -65,6 +65,8 @@ model PlanSPK {
   isRepeatFailed    Boolean   @default(false) @map("is_repeat_failed")
   isUnplanned       Boolean   @default(false) @map("is_unplanned")
 
+  histories         PlanSpkHistory[]
+
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -127,4 +129,38 @@ model DatabaseBackupLog {
 
   @@index([createdAt])
   @@map("database_backup_logs")
+}
+
+// ─── PROSPECT & AUDIT TRAIL ENGINE (MODUL 6) ───────────────────────────────
+
+model ProspectEngineSetting {
+  id                      String   @id @default("cabang_220")
+  cutoffHourWib           Int      @default(17) @map("cutoff_hour_wib")
+  cutoffMinuteWib         Int      @default(0)  @map("cutoff_minute_wib")
+  enableInterSalesCheck   Boolean  @default(true) @map("enable_inter_sales_check")
+  enableReInputTracking   Boolean  @default(true) @map("enable_re_input_tracking")
+  enableNameNormalization Boolean  @default(true) @map("enable_name_normalization")
+  allowSalesUnplanned     Boolean  @default(false) @map("allow_sales_unplanned")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  @@map("prospect_engine_settings")
+}
+
+model PlanSpkHistory {
+  id            String   @id @default(cuid())
+  planSpkId     String   @map("plan_spk_id")
+  actorId       String?  @map("actor_id")
+  actorName     String   @map("actor_name")
+  actorRole     String   @map("actor_role")
+  actionType    String   @map("action_type")
+  previousValue String?  @map("previous_value") @db.Text
+  newValue      String?  @map("new_value") @db.Text
+  details       String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  planSpk       PlanSPK  @relation(fields: [planSpkId], references: [id], onDelete: Cascade)
+
+  @@index([planSpkId])
+  @@index([createdAt])
+  @@map("plan_spk_histories")
 }

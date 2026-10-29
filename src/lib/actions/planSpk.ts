@@ -31,6 +31,7 @@ import {
   canChangeSpkStatus,
 } from "@/lib/auth/roleRoutes";
 import { sendPlanSpkNotification } from "@/lib/whatsapp/client";
+import { recordPlanSpkAuditLog } from "./prospectEngineAdmin";
 import { SpkStatus } from "@prisma/client";
 import type { PlanSPK, User, Prisma } from "@prisma/client";
 
@@ -203,6 +204,16 @@ export async function createPlanSpk(
       console.error("[createPlanSpk] Kendala pengiriman notifikasi:", notifError);
     });
 
+    recordPlanSpkAuditLog({
+      planSpkId: newPlan.id,
+      actorId: userId,
+      actorName: salesUser?.name || "Sales Cabang 220",
+      actorRole: session.user.role || "SALES",
+      actionType: "CREATE",
+      newValue: "PENDING",
+      details: `Input rencana SPK unit ${unitName.trim()} (Target: ${finalPlanDate.toISOString().split("T")[0]}).`,
+    }).catch(() => {});
+
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
     return { success: true, data: newPlan };
@@ -338,6 +349,16 @@ export async function updateSpkStatus(
       data: { spkStatus: parsed.data.spkStatus },
     });
 
+    recordPlanSpkAuditLog({
+      planSpkId: planId,
+      actorId: session.user.id,
+      actorName: session.user.name || "Admin/ADH",
+      actorRole: session.user.role || "ADMIN",
+      actionType: "STATUS_CHANGE",
+      newValue: parsed.data.spkStatus,
+      details: `Status realisasi diperbarui menjadi ${parsed.data.spkStatus}.`,
+    }).catch(() => {});
+
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
     safeRevalidatePath("/admin/team");
@@ -375,6 +396,15 @@ export async function updateKeteranganSpv(
       where: { id: planId },
       data: { keteranganSpv: parsed.data.keteranganSpv },
     });
+
+    recordPlanSpkAuditLog({
+      planSpkId: planId,
+      actorId: session.user.id,
+      actorName: session.user.name || "SPV Cabang 220",
+      actorRole: session.user.role || "SPV",
+      actionType: "SPV_NOTE",
+      details: `Catatan SPV: "${parsed.data.keteranganSpv || "-"}".`,
+    }).catch(() => {});
 
     safeRevalidatePath("/admin/prospects");
     safeRevalidatePath("/admin/team");
@@ -416,6 +446,16 @@ export async function updateSpkStatusDanAdmin(
         isUnplanned: parsed.data.isUnplanned,
       },
     });
+
+    recordPlanSpkAuditLog({
+      planSpkId: planId,
+      actorId: session.user.id,
+      actorName: session.user.name || "Admin/ADH",
+      actorRole: session.user.role || "ADMIN",
+      actionType: "STATUS_CHANGE",
+      newValue: parsed.data.spkStatus,
+      details: `Status realisasi: ${parsed.data.spkStatus}. Catatan Admin: "${parsed.data.keteranganAdmin || "-"}".`,
+    }).catch(() => {});
 
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");
@@ -472,6 +512,16 @@ export async function createUnplannedSpk(
         isUnplanned: true,
       },
     });
+
+    recordPlanSpkAuditLog({
+      planSpkId: created.id,
+      actorId: session.user.id,
+      actorName: session.user.name || "Admin/ADH",
+      actorRole: session.user.role || "ADMIN",
+      actionType: "UNPLANNED",
+      newValue: spkStatus,
+      details: `Pendaftaran SPK Unplanned hari-H langsung oleh Admin/ADH.`,
+    }).catch(() => {});
 
     safeRevalidatePath("/input");
     safeRevalidatePath("/admin/prospects");

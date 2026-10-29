@@ -6,6 +6,7 @@ import UserSettingsClient from "./UserSettingsClient";
 import WhatsAppSettingsClient from "./WhatsAppSettingsClient";
 import BackupSettingsClient from "./BackupSettingsClient";
 import RoleSettingsClient from "./RoleSettingsClient";
+import ProspectSettingsClient from "./ProspectSettingsClient";
 import type { DatabaseHealthStats } from "@/lib/actions/databaseAdmin";
 import {
   Database,
@@ -142,21 +143,7 @@ export default function SettingsTabsClient({
       )}
 
       {activeTab === "PROSPECTS" && (
-        <div className="p-8 rounded-3xl bg-white border border-slate-200 shadow-2xs text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center mx-auto">
-            <Sliders className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">
-            Modul 6: Management Prospect Engine
-          </h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Pengaturan sensitivitas algoritma deteksi duplikat, tombol re-scan duplicate flags, dan pengaturan fleksibel jam cutoff.
-          </p>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            Siap dibangun pada tahap berikutnya
-          </span>
-        </div>
+        <ProspectSettingsClient />
       )}
     </div>
   );
