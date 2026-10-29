@@ -15,7 +15,6 @@ import {
   HardDriveDownload,
   ShieldCheck,
   Sliders,
-  Sparkles,
 } from "lucide-react";
 
 export type SettingsTabId =

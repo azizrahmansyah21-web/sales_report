@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS: ProspectEngineSettingsData = {
  * Normalisasi nama pelanggan untuk mendeteksi variasi penulisan.
  * Menghapus tanda baca, spasi ganda, dan sapaan/gelar umum (Pak, Ibu, Haji, dr., dll.)
  */
-export function normalizeCustomerName(
+function normalizeCustomerName(
   rawName: string,
   enableNormalization: boolean = true
 ): string {
